@@ -1,0 +1,201 @@
+{
+  "_schema": {
+    "description": "Item-level ground truth v0 — the canonical layer the checklist engine and RAG buckets serve to users. Each item aggregates the provenance claims in seed-claims.json into a consensus verdict, a contested flag, context-dependent overrides, and price/weight facts. `support` counts claims by verdict; `claimIds` links back to evidence. This is what a new user sees on day one, before their own cohort's feedback starts adjusting `communityStats` (empty now — filled post-launch).",
+    "verdicts": ["bring-from-india", "buy-in-us", "either", "skip"],
+    "confidence": "high (multi-source agreement or verified) | medium (consistent but unverified) | low (single/weak source)",
+    "contested": "true when reputable sources give opposing verdicts; UI should show both sides"
+  },
+  "meta": {
+    "version": "0.1.0",
+    "generatedOn": "2026-07-13",
+    "provenance": "deep-research workflow wf_a4cb7f0c-7f3 (17 sources: 6 university ISS pages, 8 blogs, 2 forums, 1 price-reference), synthesized manually",
+    "luggageBaseline": { "checkedBagKg": 23, "checkedBagLinearCm": 158, "typicalCheckedBags": 2, "cabinKg": 7, "note": "Most India→US economy tickets: 2×23 kg checked + 1 cabin. Confirm per airline/fare." },
+    "priceBaseline": { "costOfLivingUSvsIndiaPct": 288.2, "groceriesUSvsIndiaPct": 258.5, "source": "numbeo" }
+  },
+  "items": [
+    {
+      "item": "documents", "category": "documents",
+      "verdict": "bring-from-india", "confidence": "high", "contested": false,
+      "detail": "Passport, I-20/DS-2019 originals, SEVIS receipt, admission letter, financial proofs, transcripts, immunization records — plus 2-3 photocopies and scanned digital backups. Carry originals on your person; never in checked baggage.",
+      "support": { "bring-from-india": 3 }, "claimIds": ["c041", "c049", "c044"],
+      "context": {}, "price": null, "weightNote": "negligible weight; carry-on only",
+      "communityStats": null
+    },
+    {
+      "item": "prescription medicines", "category": "medicines",
+      "verdict": "bring-from-india", "confidence": "high", "contested": false,
+      "detail": "Carry a 1-2 month supply of ongoing prescriptions with a doctor's signed letter listing generic drug names and reason — both for customs legality and because US drug prices are far higher. Note some states reject out-of-state/foreign prescriptions, so the written description matters.",
+      "support": { "bring-from-india": 5 }, "claimIds": ["c004", "c009", "c018", "c057", "c062"],
+      "context": {}, "price": { "note": "US drug prices multiples of India; see American Pharmaceutical Review comparison" }, "weightNote": "light",
+      "communityStats": null
+    },
+    {
+      "item": "otc medicines", "category": "medicines",
+      "verdict": "bring-from-india", "confidence": "medium", "contested": true,
+      "detail": "Bring a small starter kit (paracetamol, ibuprofen, antacids, anti-allergics, Dettol, bandages) — familiar brands, and you'll want them before you set up US healthcare. One university advises buying OTC in the US to save space, so keep the kit small rather than a bulk stock.",
+      "support": { "bring-from-india": 4, "buy-in-us": 1 }, "claimIds": ["c005", "c018", "c050", "c057"],
+      "context": {}, "price": null, "weightNote": "keep to a small kit",
+      "communityStats": null
+    },
+    {
+      "item": "eyeglasses", "category": "medicines",
+      "verdict": "bring-from-india", "confidence": "medium", "contested": false,
+      "detail": "Get 1-2 spare pairs (and/or a year of contacts) made in India before leaving. Eye exams + glasses in the US run ~$225/pair even with insurance; a fraction of that in India.",
+      "support": { "bring-from-india": 1 }, "claimIds": ["c030"],
+      "context": {}, "price": { "usd": 225, "note": "US per pair with insurance; far cheaper in India" }, "weightNote": "light",
+      "communityStats": null
+    },
+    {
+      "item": "winter jacket", "category": "clothing",
+      "verdict": "either", "confidence": "medium", "contested": true,
+      "detail": "The single most contested item. Emerging consensus: BRING thermal base layers, wool socks, gloves, a beanie, and a light/transit jacket; BUY the heavy down coat in the US, where it's better suited to sustained sub-zero cold and cheap on Black Friday (down jacket ~$100, boots $60-100). Bring a full heavy coat only if you already own a good one (avoid the US cost) or are headed somewhere remote. Wear your heaviest layer on the flight to save luggage weight.",
+      "support": { "buy-in-us": 5, "bring-from-india": 5, "either": 1 },
+      "claimIds": ["c011", "c020", "c024", "c026", "c042", "c044", "c048", "c051", "c058", "c063", "c010"],
+      "context": {
+        "climate": { "cold": "Full winter gear is essential; the bring-vs-buy split is about where you buy the heavy coat, not whether you need one.", "warm": "A heavy coat is largely unnecessary; skip it." },
+        "intake": { "fall": "You arrive in warmth and have weeks to buy a coat before winter — favors buy-in-US.", "spring": "You land straight into winter — bring at least a warm jacket for day one." }
+      },
+      "price": { "usd": 100, "note": "US down jacket ~$100; branded winter wear ~2x India but heavy US sales narrow it" },
+      "weightNote": "a heavy coat is bulky and weight-costly; wear it on the plane if bringing",
+      "communityStats": null
+    },
+    {
+      "item": "pressure cooker", "category": "kitchen",
+      "verdict": "either", "confidence": "medium", "contested": true,
+      "detail": "Contested. Pro-bring (most blogs): a 3-5L cooker is central to Indian cooking and pricier in the US. Pro-buy (forums + community): it's heavy, gets red-flagged and hand-inspected in checked bags, and the effective cost of carrying it roughly equals buying one there — an Instant Pot is $60-80 on US sales, and other Indian students will lend one early on. Rule of thumb: buy in the US if you'll be near an Indian community; bring a small one only if headed somewhere remote.",
+      "support": { "bring-from-india": 4, "buy-in-us": 2 },
+      "claimIds": ["c001", "c012", "c016", "c023", "c029", "c039"],
+      "context": {
+        "diet": { "veg-cooking-heavy": "Stronger case to bring/own one early since you'll cook daily.", "eats-out": "Lower priority; buy later if needed." },
+        "housing": { "dorm": "Often no kitchen access — skip initially.", "apartment": "Needed; decide bring-small vs buy Instant Pot." }
+      },
+      "price": { "usd": 70, "note": "Instant Pot $60-80 on US sale" },
+      "weightNote": "~2-3 kg + bulky; separate/empty parts and use a TSA lock if bringing",
+      "communityStats": null
+    },
+    {
+      "item": "kitchenware", "category": "kitchen",
+      "verdict": "either", "confidence": "medium", "contested": true,
+      "detail": "Lightweight, hard-to-find-cheaply items are worth bringing — a flat iron tava/griddle, a masala box, a tea strainer, a good knife. Bulky/heavy basics (pans, plates, glasses) are cheap in the US (Walmart/dollar stores) and not worth the weight; buy or ship on arrival. Skip anything electric from India (voltage).",
+      "support": { "bring-from-india": 2, "buy-in-us": 1 }, "claimIds": ["c016", "c023", "c047"],
+      "context": { "housing": { "dorm": "Minimal need.", "apartment": "Buy the bulk of it locally." } },
+      "price": null, "weightNote": "bring only light, high-use items",
+      "communityStats": null
+    },
+    {
+      "item": "spices", "category": "food",
+      "verdict": "bring-from-india", "confidence": "medium", "contested": true,
+      "detail": "Bring dry, sealed spices and masalas (turmeric, garam masala, cumin, coriander, chilli powder, hing) — a strong majority view. They're cheaper in India and marked up ~4x at US Indian stores, especially in small towns. Declare them at customs; sealed, dry, commercially-packaged spices are generally admissible. Two sources counsel caution (IDP flags 'plant products'), so keep quantities reasonable and everything sealed.",
+      "support": { "bring-from-india": 5, "skip": 1 }, "claimIds": ["c002", "c008", "c017", "c028", "c052"],
+      "context": {}, "price": { "note": "Indian groceries ~4x India price in US stores" }, "weightNote": "light and high-value; declare at CBP",
+      "communityStats": null
+    },
+    {
+      "item": "rice and lentils", "category": "food",
+      "verdict": "skip", "confidence": "medium", "contested": true,
+      "detail": "Genuinely split, but the practical verdict leans SKIP raw rice/lentils: (1) US customs restricts raw rice and unpackaged lentils (Khapra beetle rule for India), (2) they're heavy and burn your weight budget, (3) they're readily available at US Indian stores even if ~7x India prices. Some blogs still say carry a 3-4 kg bridge supply. If you carry any, keep it small, sealed, commercially packaged, and declared.",
+      "support": { "skip": 3, "bring-from-india": 2, "buy-in-us": 2, "either": 1 },
+      "claimIds": ["c003", "c013", "c017", "c027", "c033", "c037"],
+      "context": {}, "price": { "usd": 4.58, "note": "US rice ~$4.58/kg vs ~$0.64/kg India (~7x); still cheap in absolute US terms" },
+      "weightNote": "heavy; worst weight-to-value ratio on the list",
+      "communityStats": null
+    },
+    {
+      "item": "instant food", "category": "food",
+      "verdict": "bring-from-india", "confidence": "medium", "contested": false,
+      "detail": "Maggi, ready-to-eat poha/khichdi/upma, MTR-type packets — bring a couple weeks' worth. Sold only at US Indian stores and beloved in the first homesick months. Non-perishable and light.",
+      "support": { "bring-from-india": 2 }, "claimIds": ["c014", "c056"],
+      "context": {}, "price": null, "weightNote": "light",
+      "communityStats": null
+    },
+    {
+      "item": "specialty snacks", "category": "food",
+      "verdict": "bring-from-india", "confidence": "medium", "contested": false,
+      "detail": "Favorite non-perishable snacks and homemade dry items (theplas, chutney powders, laddus) that are hard to find or expensive in the US. Universities themselves endorse this. Must be dry, sealed, and declared.",
+      "support": { "bring-from-india": 2 }, "claimIds": ["c046", "c056"],
+      "context": {}, "price": null, "weightNote": "light",
+      "communityStats": null
+    },
+    {
+      "item": "perishable food", "category": "food",
+      "verdict": "skip", "confidence": "high", "contested": false,
+      "detail": "Do NOT pack fresh produce, meat, dairy, seeds, plants, or homemade wet/perishable food. US customs (CBP/USDA) confiscates them and undeclared items risk civil penalties. This is a hard rule, not a preference.",
+      "support": { "skip": 3 }, "claimIds": ["c025", "c043"],
+      "context": {}, "price": null, "weightNote": null,
+      "communityStats": null
+    },
+    {
+      "item": "bedding", "category": "bedding",
+      "verdict": "buy-in-us", "confidence": "high", "contested": false,
+      "detail": "Buy or ship on arrival — strong, unanimous university guidance. US dorm beds are Twin XL (39\"×80\"), a size your Indian sheets won't fit, and linens are bulky. Order sheets/pillow/blanket online for delivery before move-in. Cheap: sheets $15-25, pillow ~$10, towels ~$15, blanket $20-75.",
+      "support": { "buy-in-us": 4 }, "claimIds": ["c045", "c047", "c054", "c060"],
+      "context": { "housing": { "dorm": "Twin XL — buy in US.", "apartment": "You choose the bed; buy bedding locally to match." } },
+      "price": { "usd": 60, "note": "full set roughly $60-125" }, "weightNote": "bulky; do not pack",
+      "communityStats": null
+    },
+    {
+      "item": "electrical appliances", "category": "electronics",
+      "verdict": "buy-in-us", "confidence": "high", "contested": false,
+      "detail": "Do NOT bring Indian 220-240V appliances (rice cookers, kettles, hair dryers, irons, lamps). US is 110-120V/60Hz — they need a bulky transformer and often just fail. They're cheap in the US. Bring only your laptop/phone chargers plus a couple of Type A/B plug adapters.",
+      "support": { "buy-in-us": 3 }, "claimIds": ["c040", "c055", "c061"],
+      "context": {}, "price": null, "weightNote": "transformers are heavy — not worth it",
+      "communityStats": null
+    },
+    {
+      "item": "consumer electronics", "category": "electronics",
+      "verdict": "buy-in-us", "confidence": "medium", "contested": false,
+      "detail": "Bring your existing working laptop and phone. Buy NEW electronics, headphones, and accessories in the US — significantly cheaper (e.g. iPhone 11 Pro $999 US vs ₹99,900 India) and Black Friday sales in late November are the moment to buy.",
+      "support": { "buy-in-us": 2 }, "claimIds": ["c015", "c034"],
+      "context": {}, "price": { "usd": 999, "inr": 99900, "note": "iPhone example; electronics broadly cheaper in US" }, "weightNote": null,
+      "communityStats": null
+    },
+    {
+      "item": "universal power adapter", "category": "electronics",
+      "verdict": "bring-from-india", "confidence": "medium", "contested": false,
+      "detail": "Bring 1-2 universal/Type A-B plug adapters and a power strip so you can charge everything from day one. Cheap and essential — Indian plugs don't fit US sockets.",
+      "support": { "bring-from-india": 1 }, "claimIds": ["c022"],
+      "context": {}, "price": null, "weightNote": "light",
+      "communityStats": null
+    },
+    {
+      "item": "branded clothing", "category": "clothing",
+      "verdict": "buy-in-us", "confidence": "medium", "contested": false,
+      "detail": "Bring ~2 weeks of everyday clothes, then shop in the US. Branded apparel and sports shoes are ~2x cheaper in the US with student discounts and Black Friday sales (Nike shoes ~$40 vs ~$90 India). Don't stock up on branded items in India.",
+      "support": { "buy-in-us": 2, "either": 1 }, "claimIds": ["c035", "c038"],
+      "context": {}, "price": { "note": "branded clothing/shoes ~2x cheaper in US on sale" }, "weightNote": null,
+      "communityStats": null
+    },
+    {
+      "item": "formal wear", "category": "clothing",
+      "verdict": "bring-from-india", "confidence": "low", "contested": false,
+      "detail": "Bring 1 formal outfit (suit/blazer or a saree/sherwani for cultural events) — tailoring is far cheaper in India, and ethnic wear has limited, costly options in the US. You'll want it for presentations, conferences, and Diwali/cultural nights.",
+      "support": { "bring-from-india": 1 }, "claimIds": ["c032"],
+      "context": {}, "price": null, "weightNote": "1 outfit only",
+      "communityStats": null
+    },
+    {
+      "item": "toiletries", "category": "toiletries",
+      "verdict": "buy-in-us", "confidence": "high", "contested": false,
+      "detail": "Bring a ~1-month starter kit only; buy the rest in the US where cosmetics, shampoo, soap, and hangers are cheap (13 hangers/$1 at Walmart) and universities run an orientation shopping trip. Don't waste weight on bulk toiletries.",
+      "support": { "buy-in-us": 4 }, "claimIds": ["c031", "c053", "c059"],
+      "context": {}, "price": null, "weightNote": "starter kit only; bulk toiletries waste weight",
+      "communityStats": null
+    },
+    {
+      "item": "stationery and textbooks", "category": "toiletries",
+      "verdict": "buy-in-us", "confidence": "medium", "contested": false,
+      "detail": "Buy stationery locally and buy/borrow textbooks in the US (or use the library / PDFs). Don't pack heavy books — use an e-reader. Textbooks and heavy reading material are explicitly on the skip list.",
+      "support": { "buy-in-us": 2, "skip": 1 }, "claimIds": ["c007", "c019", "c021"],
+      "context": {}, "price": null, "weightNote": "heavy books are a classic packing regret",
+      "communityStats": null
+    },
+    {
+      "item": "cash (usd)", "category": "money",
+      "verdict": "bring-from-india", "confidence": "medium", "contested": false,
+      "detail": "Carry modest emergency cash — universities suggest ~$200-300 per person for the first days (taxi, SIM, food) plus a forex/travel card. RBI permits up to $3,000 cash. Don't carry large sums.",
+      "support": { "bring-from-india": 3 }, "claimIds": ["c046", "c036"],
+      "context": {}, "price": { "usd": 250, "note": "$200-300 emergency cash; RBI cash limit $3,000" }, "weightNote": null,
+      "communityStats": null
+    }
+  ]
+}

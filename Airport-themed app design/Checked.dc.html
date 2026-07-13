@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: #ECE6D8; }
+  a { color: #1466D8; text-decoration: none; }
+  a:hover { color: #0F4FA8; }
+  ::selection { background: #F5A62333; }
+  @keyframes ck-blink { 0%,60% { opacity: 1; } 61%,100% { opacity: .15; } }
+  @keyframes ck-flap { 0% { transform: rotateX(-88deg); opacity:.4; } 100% { transform: rotateX(0); opacity:1; } }
+  input::placeholder { color: #A39A88; }
+  select { -webkit-appearance: none; appearance: none; }
+</style>
+</helmet>
+<div style="min-height:100vh;background:#ECE6D8;color:#14202E;font-family:'Hanken Grotesk',system-ui,sans-serif;">
+
+  <header data-screen-label="Global nav" style="position:sticky;top:0;z-index:40;background:#0D1626;border-bottom:1px solid #1E2E48;">
+    <div style="max-width:1120px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:60px;padding:0 20px;gap:12px;">
+      <div onClick="{{ goLanding }}" style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+        <span style="display:grid;place-items:center;height:30px;width:30px;border-radius:7px;background:#F5A623;color:#1B1200;font-weight:700;font-size:17px;">✓</span>
+        <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px;letter-spacing:.02em;color:#F7F3EA;">Checked</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.22em;color:#5E77A0;padding-left:8px;border-left:1px solid #24354F;">DEPARTURES</span>
+      </div>
+      <nav style="display:flex;gap:2px;flex-wrap:wrap;justify-content:flex-end;">
+        <sc-for list="{{ navItems }}" as="item" hint-placeholder-count="4">
+          <button onClick="{{ item.onClick }}" style="{{ item.style }}">{{ item.label }}</button>
+        </sc-for>
+      </nav>
+    </div>
+  </header>
+
+  <div style="background:#0A111E;border-bottom:1px solid #16233B;">
+    <div style="max-width:1120px;margin:0 auto;padding:7px 20px;display:flex;gap:26px;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.15em;color:#6E86AD;white-space:nowrap;overflow:hidden;">
+      <span style="color:#F5A623;display:inline-flex;align-items:center;gap:6px;"><span style="width:7px;height:7px;border-radius:50%;background:#F5A623;animation:ck-blink 1.4s steps(1) infinite;"></span>LIVE</span>
+      <span>TERMINAL 1 · INTL DEPARTURES</span>
+      <span>DEL / BOM / MAA → USA</span>
+      <span>CABIN 7KG · CHECKED 2×23KG</span>
+      <span style="color:#8FA3C4;">EVERYTHING, CHECKED.</span>
+    </div>
+  </div>
+
+  <main style="max-width:1120px;margin:0 auto;padding:26px 20px 72px;">
+
+    <!-- ===================== LANDING ===================== -->
+    <sc-if value="{{ isLanding }}" hint-placeholder-val="{{ true }}">
+    <div data-screen-label="Landing" style="display:flex;flex-direction:column;gap:30px;">
+
+      <section style="background:#0D1626;border:1px solid #1E2E48;border-radius:20px;padding:30px 30px 34px;position:relative;overflow:hidden;box-shadow:0 30px 60px -30px rgba(6,12,24,.7);">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.2em;color:#5E77A0;margin-bottom:22px;">
+          <span style="color:#F5A623;">▸ DEPARTURES</span>
+          <span>13 JUL 2026 · 09:41 IST</span>
+        </div>
+        <h1 style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(38px,7vw,74px);line-height:.98;letter-spacing:-.02em;margin:0;color:#F7F3EA;">Everything,<br><span style="color:#F5A623;">checked.</span></h1>
+        <p style="max-width:560px;margin:18px 0 0;font-size:16px;line-height:1.55;color:#A9BAD4;">The chaos of a first move abroad, turned into a personalized, weight-aware, community-backed checklist — item by item, bring-vs-buy, with the reasoning behind every call.</p>
+
+        <div style="margin-top:26px;border:1px solid #22344F;border-radius:12px;overflow:hidden;">
+          <div style="display:grid;grid-template-columns:78px 1fr 52px 108px;gap:8px;padding:9px 16px;background:#0A111E;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.18em;color:#5E77A0;">
+            <span>FLIGHT</span><span>DESTINATION</span><span>GATE</span><span style="text-align:right;">STATUS</span>
+          </div>
+          <sc-for list="{{ flights }}" as="f" hint-placeholder-count="4">
+            <div onClick="{{ f.onClick }}" style="display:grid;grid-template-columns:78px 1fr 52px 108px;gap:8px;align-items:center;padding:13px 16px;border-top:1px solid #1A2942;cursor:pointer;font-family:'JetBrains Mono',monospace;">
+              <span style="color:#F5A623;font-size:14px;font-weight:500;letter-spacing:.05em;">{{ f.flight }}</span>
+              <span style="font-family:'Space Grotesk',sans-serif;color:#F7F3EA;font-size:15px;font-weight:600;letter-spacing:.02em;">{{ f.name }}<span style="display:block;font-family:'Hanken Grotesk',sans-serif;font-weight:400;font-size:12px;color:#7C90B0;letter-spacing:0;margin-top:1px;">{{ f.dest }}</span></span>
+              <span style="color:#C7D4E8;font-size:13px;">{{ f.gate }}</span>
+              <span style="justify-self:end;font-size:10px;letter-spacing:.14em;padding:4px 9px;border-radius:5px;color:{{ f.statusFg }};background:{{ f.statusBg }};">{{ f.status }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:26px;align-items:center;">
+          <button onClick="{{ goCheckin }}" style="height:48px;padding:0 24px;border:0;border-radius:9px;background:#F5A623;color:#1B1200;font-family:'Hanken Grotesk',sans-serif;font-weight:600;font-size:15px;cursor:pointer;">Start with Check-In →</button>
+          <button onClick="{{ goManifest }}" style="height:48px;padding:0 22px;border:1px solid #2C4064;border-radius:9px;background:transparent;color:#E7EDF7;font-family:'Hanken Grotesk',sans-serif;font-weight:600;font-size:15px;cursor:pointer;">Skip to The Manifest</button>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#5E77A0;letter-spacing:.08em;margin-left:2px;">{{ holdCount }} VERDICTS · {{ contestedCount }} CONTESTED</span>
+        </div>
+      </section>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;">
+        <sc-for list="{{ featureCards }}" as="c" hint-placeholder-count="4">
+          <div onClick="{{ c.onClick }}" style="position:relative;display:flex;background:#FFFFFF;border:1px solid #E4DCCB;border-radius:14px;overflow:hidden;cursor:pointer;box-shadow:0 1px 0 rgba(0,0,0,.03),0 18px 34px -26px rgba(20,26,38,.5);">
+            <div style="flex:1;padding:20px 20px 16px;display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:19px;letter-spacing:-.01em;">{{ c.name }}</span>
+                <span style="color:#B7AF9C;font-size:18px;">→</span>
+              </div>
+              <p style="margin:0;font-size:13.5px;line-height:1.5;color:#6C6555;flex:1;">{{ c.blurb }}</p>
+              <div style="display:flex;align-items:center;gap:6px;height:26px;margin-top:2px;">
+                <span style="display:flex;gap:2px;align-items:flex-end;height:22px;">
+                  <span style="width:2px;height:22px;background:#14202E;"></span><span style="width:1px;height:22px;background:#14202E;"></span><span style="width:3px;height:22px;background:#14202E;"></span><span style="width:1px;height:22px;background:#14202E;"></span><span style="width:2px;height:22px;background:#14202E;"></span><span style="width:1px;height:22px;background:#14202E;"></span><span style="width:3px;height:22px;background:#14202E;"></span><span style="width:2px;height:22px;background:#14202E;"></span><span style="width:1px;height:22px;background:#14202E;"></span>
+                </span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:#9A917E;">{{ c.flight }} · GATE {{ c.gate }}</span>
+              </div>
+            </div>
+            <div style="position:relative;width:0;border-left:2px dashed #E0D6C2;"></div>
+            <span style="position:absolute;top:-8px;right:52px;width:16px;height:16px;border-radius:50%;background:#ECE6D8;border:1px solid #E4DCCB;"></span>
+            <span style="position:absolute;bottom:-8px;right:52px;width:16px;height:16px;border-radius:50%;background:#ECE6D8;border:1px solid #E4DCCB;"></span>
+            <div style="width:52px;background:#0D1626;display:flex;align-items:center;justify-content:center;">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.32em;color:#F5A623;writing-mode:vertical-rl;transform:rotate(180deg);">BOARDING PASS</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ===================== CHECK-IN ===================== -->
+    <sc-if value="{{ isCheckin }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Check-In" style="max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:20px;">
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.2em;color:#9A917E;margin-bottom:8px;">GATE A1 · CK 01</div>
+        <h1 style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:34px;letter-spacing:-.02em;margin:0;">Check-In</h1>
+        <p style="margin:6px 0 0;color:#6C6555;font-size:15px;">A two-minute conversation so The Manifest is tailored to you.</p>
+      </div>
+
+      <div style="background:#FFFFFF;border:1px solid #E4DCCB;border-radius:16px;padding:22px;box-shadow:0 18px 34px -28px rgba(20,26,38,.5);display:flex;flex-direction:column;gap:16px;">
+        <sc-for list="{{ chatHistory }}" as="t" hint-placeholder-count="2">
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;justify-content:flex-start;"><div style="max-width:85%;background:#F1ECE0;color:#14202E;border-radius:16px 16px 16px 4px;padding:10px 14px;font-size:14.5px;line-height:1.45;">{{ t.bot }}</div></div>
+            <div style="display:flex;justify-content:flex-end;"><div style="max-width:85%;background:#1466D8;color:#fff;border-radius:16px 16px 4px 16px;padding:10px 14px;font-size:14.5px;line-height:1.45;">{{ t.answer }}</div></div>
+          </div>
+        </sc-for>
+
+        <sc-if value="{{ chatActive }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;justify-content:flex-start;"><div style="max-width:85%;background:#F1ECE0;color:#14202E;border-radius:16px 16px 16px 4px;padding:10px 14px;font-size:14.5px;line-height:1.45;">{{ currentPrompt }}</div></div>
+            <sc-if value="{{ stepIsText }}" hint-placeholder-val="{{ false }}">
+              <form onSubmit="{{ onChatSubmit }}" style="display:flex;gap:8px;">
+                <input value="{{ chatText }}" onChange="{{ onChatInput }}" placeholder="{{ currentPlaceholder }}" style="height:44px;flex:1;border:1px solid #DDD3C0;border-radius:9px;background:#FBF9F3;padding:0 14px;font-size:14.5px;font-family:'Hanken Grotesk',sans-serif;color:#14202E;outline:none;">
+                <button type="submit" style="height:44px;padding:0 20px;border:0;border-radius:9px;background:#1466D8;color:#fff;font-family:'Hanken Grotesk',sans-serif;font-weight:600;font-size:14.5px;cursor:pointer;">Send</button>
+              </form>
+            </sc-if>
+            <sc-if value="{{ stepIsChoice }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                <sc-for list="{{ currentOptions }}" as="o" hint-placeholder-count="3">
+                  <button onClick="{{ o.onClick }}" style="height:42px;padding:0 16px;border:1px solid #DDD3C0;border-radius:9px;background:#FBF9F3;color:#14202E;font-family:'Hanken Grotesk',sans-serif;font-weight:500;font-size:14px;cursor:pointer;">{{ o.label }}</button>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ chatDone }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center;">
+            <div style="max-width:90%;background:#F1ECE0;border-radius:16px;padding:14px 16px;font-size:14.5px;line-height:1.5;">All set, {{ doneName }}! I've tailored your Manifest — winter gear, kitchen kit and food verdicts now reflect your intake, climate, housing and cooking.</div>
+            <button onClick="{{ goManifest }}" style="height:48px;padding:0 24px;border:0;border-radius:9px;background:#F5A623;color:#1B1200;font-family:'Hanken Grotesk',sans-serif;font-weight:600;font-size:15px;cursor:pointer;">See my Manifest →</button>
+          </div>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{ chatActive }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.16em;color:#9A917E;">
+            <span>BOARDING PROGRESS</span><span>STEP {{ stepNumber }} / {{ totalSteps }}</span>
+          </div>
+          <div style="height:7px;border-radius:4px;background:#E0D6C2;overflow:hidden;"><div style="height:100%;border-radius:4px;background:#F5A623;width:{{ progressPct }}%;"></div></div>
+        </div>
+      </sc-if>
+    </div>
+    </sc-if>
+
+    <!-- ===================== THE MANIFEST ===================== -->
+    <sc-if value="{{ isManifest }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="The Manifest" style="display:flex;flex-direction:column;gap:22px;">
+      <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:14px;">
+        <div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.2em;color:#9A917E;margin-bottom:8px;">GATE B4 · CK 02</div>
+          <h1 style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:34px;letter-spacing:-.02em;margin:0;">The Manifest</h1>
+          <p style="margin:6px 0 0;color:#6C6555;font-size:14.5px;">Tailored for {{ profileName }} · {{ profileCity }} · {{ profileIntake }} intake · {{ profileHousing }}.</p>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:#14202E;">{{ listedCount }}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;color:#9A917E;">ITEMS ON LIST</div>
+        </div>
+      </div>
+
+      <sc-for list="{{ manifestGroups }}" as="group" hint-placeholder-count="4">
+        <section style="display:flex;flex-direction:column;gap:8px;">
+          <h2 style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#9A917E;margin:8px 0 0;">{{ group.label }}</h2>
+          <div style="background:#FFFFFF;border:1px solid #E4DCCB;border-radius:14px;overflow:hidden;box-shadow:0 12px 26px -24px rgba(20,26,38,.5);">
+            <sc-for list="{{ group.items }}" as="item" hint-placeholder-count="3">
+              <div style="padding:15px 16px;border-top:1px solid #F0EADD;">
+                <div style="display:flex;align-items:flex-start;gap:12px;">
+                  <input type="checkbox" checked="{{ item.listed }}" onChange="{{ item.onToggle }}" style="margin-top:3px;width:17px;height:17px;accent-color:#1466D8;cursor:pointer;flex-shrink:0;">
+                  <div style="min-width:0;flex:1;">
+                    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+                      <span style="font-weight:600;font-size:15px;">{{ item.name }}</span>
+                      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A917E;">{{ item.weightStr }}</span>
+                    </div>
+                    <button onClick="{{ item.onWhy }}" style="margin-top:3px;border:0;background:transparent;padding:0;font-family:'Hanken Grotesk',sans-serif;font-size:12.5px;color:#9A917E;cursor:pointer;text-decoration:underline;text-underline-offset:2px;">{{ item.whyLabel }}</button>
+                    <sc-if value="{{ item.open }}" hint-placeholder-val="{{ false }}">
+                      <div style="margin-top:10px;border-left:2px solid #EADFCB;padding-left:12px;display:flex;flex-direction:column;gap:8px;">
+                        <p style="margin:0;font-size:13.5px;line-height:1.55;color:#6C6555;">{{ item.detail }}</p>
+                        <sc-for list="{{ item.notes }}" as="n" hint-placeholder-count="1">
+                          <p style="margin:0;font-size:13.5px;line-height:1.5;color:#14202E;"><span style="font-weight:700;color:#1466D8;">For you:</span> {{ n }}</p>
+                        </sc-for>
+                        <p style="margin:0;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.06em;color:#A79E8B;">CONFIDENCE {{ item.confidence }} · {{ item.sources }} SOURCES IN THE HOLD</p>
+                      </div>
+                    </sc-if>
+                  </div>
+                  <span style="flex-shrink:0;display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;border:1px solid {{ item.vBd }};background:{{ item.vBg }};color:{{ item.vFg }};font-size:11.5px;font-weight:600;white-space:nowrap;">{{ item.vLabel }}<sc-if value="{{ item.contested }}" hint-placeholder-val="{{ false }}"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;opacity:.75;">•CONTESTED</span></sc-if></span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+      </sc-for>
+
+      <div style="position:sticky;bottom:16px;margin:8px auto 0;max-width:440px;width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#0D1626;border:1px solid #22344F;border-radius:999px;padding:10px 12px 10px 20px;box-shadow:0 18px 34px -20px rgba(6,12,24,.7);">
+        <span style="color:#E7EDF7;font-size:14px;">{{ listedCount }} items ready to weigh</span>
+        <button onClick="{{ goWeighin }}" style="height:38px;padding:0 18px;border:0;border-radius:999px;background:#F5A623;color:#1B1200;font-family:'Hanken Grotesk',sans-serif;font-weight:600;font-size:13.5px;cursor:pointer;">Weigh-In →</button>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ===================== WEIGH-IN ===================== -->
+    <sc-if value="{{ isWeighin }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Weigh-In" style="display:flex;flex-direction:column;gap:22px;">
+      <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:14px;">
+        <div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.2em;color:#9A917E;margin-bottom:8px;">GATE C2 · CK 03</div>
+          <h1 style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:34px;letter-spacing:-.02em;margin:0;">Weigh-In</h1>
+          <p style="margin:6px 0 0;color:#6C6555;font-size:14.5px;max-width:520px;">Drag items into a bag (or use the menu). Watch the meters — green is good, amber is close, red is over the limit.</p>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;">{{ totalKgStr }} kg</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;color:#9A917E;">{{ unpackedCount }} UNPACKED</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;">
+        <sc-for list="{{ weighCols }}" as="col" hint-placeholder-count="4">
+          <div onDrop="{{ col.onDrop }}" onDragOver="{{ col.onDragOver }}" style="display:flex;flex-direction:column;gap:10px;min-height:220px;border:1px solid #E4DCCB;border-radius:14px;background:#F6F1E6;padding:14px;">
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;">
+                <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;">{{ col.title }}</span>
+                <sc-if value="{{ col.showMeter }}" hint-placeholder-val="{{ true }}"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:{{ col.numColor }};">{{ col.kgStr }}/{{ col.limitStr }}</span></sc-if>
+              </div>
+              <sc-if value="{{ col.showMeter }}" hint-placeholder-val="{{ true }}">
+                <div style="height:8px;border-radius:5px;background:#E4DCCB;overflow:hidden;"><div style="height:100%;border-radius:5px;background:{{ col.color }};width:{{ col.pct }}%;transition:width .25s;"></div></div>
+              </sc-if>
+              <sc-if value="{{ col.msgShow }}" hint-placeholder-val="{{ false }}"><p style="margin:0;font-size:12px;font-weight:600;color:#D23B2E;">{{ col.msg }}</p></sc-if>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;flex:1;">
+              <sc-for list="{{ col.items }}" as="it" hint-placeholder-count="3">
+                <div draggable="true" onDragStart="{{ it.onDragStart }}" style="border:1px solid #E4DCCB;border-radius:9px;background:#FFFFFF;padding:9px 10px;cursor:grab;box-shadow:0 1px 0 rgba(0,0,0,.03);">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                    <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:500;">{{ it.name }}</span>
+                    <span style="flex-shrink:0;font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A917E;">{{ it.weightStr }}</span>
+                  </div>
+                  <select value="{{ it.currentBag }}" onChange="{{ it.onAssign }}" style="margin-top:7px;width:100%;border:1px solid #E4DCCB;border-radius:6px;background:#FBF9F3;padding:4px 8px;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.04em;color:#6C6555;cursor:pointer;">
+                    <option value="">◦ Unpacked</option>
+                    <option value="bag1">→ Checked Bag 1</option>
+                    <option value="bag2">→ Checked Bag 2</option>
+                    <option value="cabin">→ Cabin</option>
+                  </select>
+                </div>
+              </sc-for>
+              <sc-if value="{{ col.empty }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:1;display:grid;place-items:center;border:1px dashed #D8CEBB;border-radius:9px;color:#A79E8B;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;min-height:60px;">DROP ITEMS HERE</div>
+              </sc-if>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ===================== THE TOWER ===================== -->
+    <sc-if value="{{ isTower }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="The Tower" style="max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:20px;">
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.2em;color:#9A917E;margin-bottom:8px;">GATE D7 · CK 04 · ATC</div>
+        <h1 style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:34px;letter-spacing:-.02em;margin:0;">The Tower</h1>
+        <p style="margin:6px 0 0;color:#6C6555;font-size:15px;">Ask anything about packing, customs, or bring-vs-buy. Answers are grounded in The Hold — our community-backed corpus.</p>
+      </div>
+
+      <form onSubmit="{{ onTowerSubmit }}" style="display:flex;gap:8px;">
+        <input value="{{ towerQuery }}" onChange="{{ onTowerInput }}" placeholder="Ask the Tower…" style="height:50px;flex:1;border:1px solid #DDD3C0;border-radius:10px;background:#FFFFFF;padding:0 16px;font-size:15px;font-family:'Hanken Grotesk',sans-serif;color:#14202E;outline:none;box-shadow:0 12px 26px -24px rgba(20,26,38,.5);">
+        <button type="submit" style="height:50px;padding:0 26px;border:0;border-radius:10px;background:#1466D8;color:#fff;font-family:'Hanken Grotesk',sans-serif;font-weight:600;font-size:15px;cursor:pointer;">Ask</button>
+      </form>
+
+      <sc-if value="{{ showExamples }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          <sc-for list="{{ examples }}" as="ex" hint-placeholder-count="4">
+            <button onClick="{{ ex.onClick }}" style="border:1px solid #DDD3C0;border-radius:999px;background:#FFFFFF;padding:8px 14px;font-family:'Hanken Grotesk',sans-serif;font-size:13px;color:#6C6555;cursor:pointer;">{{ ex.text }}</button>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ towerAsked }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <p style="margin:0;font-size:14px;"><span style="color:#9A917E;">You asked:</span> <span style="font-weight:600;">{{ towerAsked }}</span></p>
+          <sc-for list="{{ towerResults }}" as="r" hint-placeholder-count="2">
+            <div style="background:#FFFFFF;border:1px solid #E4DCCB;border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:9px;box-shadow:0 12px 26px -24px rgba(20,26,38,.5);">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px;text-transform:capitalize;">{{ r.item }}</span>
+                <span style="flex-shrink:0;display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;border:1px solid {{ r.vBd }};background:{{ r.vBg }};color:{{ r.vFg }};font-size:11.5px;font-weight:600;white-space:nowrap;">{{ r.vLabel }}<sc-if value="{{ r.contested }}" hint-placeholder-val="{{ false }}"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;opacity:.75;">•CONTESTED</span></sc-if></span>
+              </div>
+              <p style="margin:0;font-size:14px;line-height:1.55;color:#6C6555;">{{ r.detail }}</p>
+              <p style="margin:0;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.06em;color:#A79E8B;">CONFIDENCE {{ r.confidence }} · GROUNDED IN {{ r.sources }} SOURCES FROM THE HOLD</p>
+            </div>
+          </sc-for>
+          <sc-if value="{{ towerEmpty }}" hint-placeholder-val="{{ false }}">
+            <p style="margin:0;background:#FFFFFF;border:1px solid #E4DCCB;border-radius:14px;padding:16px 18px;font-size:14px;color:#6C6555;line-height:1.55;">The Hold doesn't have a confident answer on that yet. As students Debrief after arriving, coverage grows — and a live AI assistant will handle open questions in a later version.</p>
+          </sc-if>
+          <p style="margin:0;text-align:center;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;color:#A79E8B;">LOCAL RETRIEVAL OVER THE HOLD · ROUTED-RAG + CLAUDE API PLUGS IN HERE</p>
+        </div>
+      </sc-if>
+    </div>
+    </sc-if>
+
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  V = {
+    "bring-from-india": { label: "Bring from India", fg: "#147A48", bg: "#E7F4EC", bd: "#B7E0C6" },
+    "buy-in-us":        { label: "Buy in the US",     fg: "#1257B8", bg: "#E7F0FB", bd: "#BDD6F5" },
+    "either":           { label: "Either / your call", fg: "#9A5B00", bg: "#FBF1DC", bd: "#F0DBAE" },
+    "skip":             { label: "Skip",              fg: "#B23127", bg: "#FBE8E5", bd: "#F2C9C2" },
+  };
+
+  HOLD = {
+    "documents": { verdict: "bring-from-india", confidence: "high", contested: false, sources: 3, detail: "Passport, I-20/DS-2019 originals, SEVIS receipt, admission letter, financial proofs, transcripts, immunization records — plus 2-3 photocopies and scanned backups. Carry originals on your person; never in checked baggage." },
+    "prescription medicines": { verdict: "bring-from-india", confidence: "high", contested: false, sources: 5, detail: "Carry a 1-2 month supply of ongoing prescriptions with a doctor's signed letter listing generic drug names and reason — for customs legality and because US drug prices are far higher." },
+    "otc medicines": { verdict: "bring-from-india", confidence: "medium", contested: true, sources: 4, detail: "Bring a small starter kit (paracetamol, ibuprofen, antacids, anti-allergics, Dettol, bandages) — familiar brands, before you set up US healthcare. One university advises buying OTC in the US to save space, so keep the kit small." },
+    "eyeglasses": { verdict: "bring-from-india", confidence: "medium", contested: false, sources: 1, detail: "Get 1-2 spare pairs (and/or a year of contacts) made in India before leaving. Eye exams + glasses in the US run ~$225/pair even with insurance; a fraction of that in India." },
+    "winter jacket": { verdict: "either", confidence: "medium", contested: true, sources: 11, detail: "The single most contested item. Consensus: BRING thermal base layers, wool socks, gloves, a beanie, and a light/transit jacket; BUY the heavy down coat in the US (~$100 on Black Friday). Wear your heaviest layer on the flight to save weight.",
+      context: { climate: { cold: "Full winter gear is essential; the bring-vs-buy split is about where you buy the heavy coat, not whether you need one.", warm: "A heavy coat is largely unnecessary; skip it." }, intake: { fall: "You arrive in warmth and have weeks to buy a coat before winter — favors buy-in-US.", spring: "You land straight into winter — bring at least a warm jacket for day one." } } },
+    "branded clothing": { verdict: "buy-in-us", confidence: "medium", contested: false, sources: 2, detail: "Bring ~2 weeks of everyday clothes, then shop in the US. Branded apparel and sports shoes are ~2x cheaper in the US with student discounts and Black Friday sales (Nike shoes ~$40 vs ~$90 India)." },
+    "formal wear": { verdict: "bring-from-india", confidence: "low", contested: false, sources: 1, detail: "Bring 1 formal outfit (suit/blazer or a saree/sherwani for cultural events) — tailoring is far cheaper in India, and ethnic wear has limited, costly options in the US." },
+    "pressure cooker": { verdict: "either", confidence: "medium", contested: true, sources: 6, detail: "Contested. Pro-bring: a 3-5L cooker is central to Indian cooking and pricier in the US. Pro-buy: it's heavy, gets hand-inspected in checked bags, and an Instant Pot is $60-80 on US sales. Rule of thumb: buy in the US if near an Indian community; bring a small one only if headed somewhere remote.",
+      context: { diet: { "veg-cooking-heavy": "Stronger case to bring/own one early since you'll cook daily." }, housing: { dorm: "Often no kitchen access — skip initially.", apartment: "Needed; decide bring-small vs buy Instant Pot." } } },
+    "kitchenware": { verdict: "either", confidence: "medium", contested: true, sources: 3, detail: "Lightweight, hard-to-find items are worth bringing — a flat iron tava, a masala box, a tea strainer, a good knife. Bulky basics (pans, plates) are cheap in the US; buy on arrival. Skip anything electric from India (voltage).",
+      context: { housing: { dorm: "Minimal need.", apartment: "Buy the bulk of it locally." } } },
+    "spices": { verdict: "bring-from-india", confidence: "medium", contested: true, sources: 5, detail: "Bring dry, sealed spices and masalas (turmeric, garam masala, cumin, coriander, chilli, hing). Cheaper in India and marked up ~4x at US Indian stores. Declare at customs; keep quantities reasonable and everything sealed." },
+    "instant food": { verdict: "bring-from-india", confidence: "medium", contested: false, sources: 2, detail: "Maggi, ready-to-eat poha/khichdi/upma, MTR-type packets — bring a couple weeks' worth. Sold only at US Indian stores and beloved in the first homesick months. Non-perishable and light." },
+    "specialty snacks": { verdict: "bring-from-india", confidence: "medium", contested: false, sources: 2, detail: "Favorite non-perishable snacks and homemade dry items (theplas, chutney powders, laddus) that are hard to find or expensive in the US. Must be dry, sealed, and declared." },
+    "rice and lentils": { verdict: "skip", confidence: "medium", contested: true, sources: 6, detail: "The practical verdict leans SKIP: US customs restricts raw rice and unpackaged lentils (Khapra beetle rule), they're heavy and burn your weight budget, and they're available at US Indian stores. If you carry any, keep it small, sealed, and declared." },
+    "perishable food": { verdict: "skip", confidence: "high", contested: false, sources: 3, detail: "Do NOT pack fresh produce, meat, dairy, seeds, plants, or homemade wet/perishable food. US customs (CBP/USDA) confiscates them and undeclared items risk civil penalties. A hard rule, not a preference." },
+    "consumer electronics": { verdict: "buy-in-us", confidence: "medium", contested: false, sources: 2, detail: "Bring your existing working laptop and phone. Buy NEW electronics, headphones, and accessories in the US — significantly cheaper, and Black Friday sales in late November are the moment to buy." },
+    "universal power adapter": { verdict: "bring-from-india", confidence: "medium", contested: false, sources: 1, detail: "Bring 1-2 universal/Type A-B plug adapters and a power strip so you can charge everything from day one. Cheap and essential — Indian plugs don't fit US sockets." },
+    "electrical appliances": { verdict: "buy-in-us", confidence: "high", contested: false, sources: 3, detail: "Do NOT bring Indian 220-240V appliances (rice cookers, kettles, hair dryers, irons). US is 110-120V/60Hz — they need a bulky transformer and often fail. Bring only chargers plus a couple of Type A/B adapters." },
+    "bedding": { verdict: "buy-in-us", confidence: "high", contested: false, sources: 4, detail: "Buy or ship on arrival — unanimous university guidance. US dorm beds are Twin XL, a size your Indian sheets won't fit, and linens are bulky. Order online for delivery before move-in.",
+      context: { housing: { dorm: "Twin XL — buy in US.", apartment: "You choose the bed; buy bedding locally to match." } } },
+    "toiletries": { verdict: "buy-in-us", confidence: "high", contested: false, sources: 3, detail: "Bring a ~1-month starter kit only; buy the rest in the US where cosmetics, shampoo, soap, and hangers are cheap. Don't waste weight on bulk toiletries." },
+    "stationery and textbooks": { verdict: "buy-in-us", confidence: "medium", contested: false, sources: 3, detail: "Buy stationery locally and buy/borrow textbooks in the US (or use the library / PDFs). Don't pack heavy books — a classic packing regret." },
+    "cash (usd)": { verdict: "bring-from-india", confidence: "medium", contested: false, sources: 3, detail: "Carry modest emergency cash — ~$200-300 for the first days (taxi, SIM, food) plus a forex/travel card. RBI permits up to $3,000 cash. Don't carry large sums." },
+  };
+
+  PACKING = [
+    { id: "passport", name: "Passport, I-20 & document folder", holdKey: "documents", category: "documents", weightKg: 0.4 },
+    { id: "doc-copies", name: "Photocopies + scanned backups", holdKey: "documents", category: "documents", weightKg: 0.2 },
+    { id: "photos", name: "Passport-size photos (10+)", holdKey: "documents", category: "documents", weightKg: 0.05 },
+    { id: "rx", name: "Prescription meds (1-2 months) + letter", holdKey: "prescription medicines", category: "medicines", weightKg: 0.5 },
+    { id: "otc-kit", name: "OTC medicine starter kit", holdKey: "otc medicines", category: "medicines", weightKg: 0.4 },
+    { id: "glasses", name: "Spare eyeglasses (2 pairs) / contacts", holdKey: "eyeglasses", category: "medicines", weightKg: 0.2 },
+    { id: "transit-jacket", name: "Light / transit jacket", holdKey: "winter jacket", category: "clothing", weightKg: 0.8 },
+    { id: "thermals", name: "Thermal base layers (x3)", holdKey: "winter jacket", category: "clothing", weightKg: 0.6 },
+    { id: "heavy-coat", name: "Heavy winter down coat", holdKey: "winter jacket", category: "clothing", weightKg: 1.8 },
+    { id: "everyday-clothes", name: "Everyday clothes (~2 weeks)", holdKey: "branded clothing", category: "clothing", weightKg: 4.5 },
+    { id: "shoes", name: "Shoes (2 pairs)", holdKey: "branded clothing", category: "clothing", weightKg: 1.8 },
+    { id: "formal", name: "Formal outfit (suit / blazer)", holdKey: "formal wear", category: "clothing", weightKg: 1.0 },
+    { id: "ethnic", name: "Ethnic wear (kurta / saree / sherwani)", holdKey: "formal wear", category: "clothing", weightKg: 0.9 },
+    { id: "cooker", name: "Pressure cooker (3 L)", holdKey: "pressure cooker", category: "kitchen", weightKg: 2.2 },
+    { id: "tava", name: "Flat tava / griddle", holdKey: "kitchenware", category: "kitchen", weightKg: 1.1 },
+    { id: "kitchen-basics", name: "Light kitchen basics (knife, strainer, masala box)", holdKey: "kitchenware", category: "kitchen", weightKg: 1.0 },
+    { id: "spices", name: "Dry spices & masalas (sealed)", holdKey: "spices", category: "food", weightKg: 1.5 },
+    { id: "instant", name: "Instant food (Maggi, ready-to-eat x12)", holdKey: "instant food", category: "food", weightKg: 1.0 },
+    { id: "snacks", name: "Home snacks (dry, sealed)", holdKey: "specialty snacks", category: "food", weightKg: 1.2 },
+    { id: "rice-dal", name: "Rice & lentils (bridge supply)", holdKey: "rice and lentils", category: "food", weightKg: 5.0 },
+    { id: "laptop", name: "Laptop (your existing) + charger", holdKey: "consumer electronics", category: "electronics", weightKg: 2.0 },
+    { id: "phone", name: "Phone + charger + cables", holdKey: "consumer electronics", category: "electronics", weightKg: 0.5 },
+    { id: "adapter", name: "Universal adapter + power strip", holdKey: "universal power adapter", category: "electronics", weightKg: 0.4 },
+    { id: "appliance", name: "Indian 220V appliance (kettle/iron)", holdKey: "electrical appliances", category: "electronics", weightKg: 1.5 },
+    { id: "bedding", name: "Bedsheets / pillow / blanket", holdKey: "bedding", category: "bedding", weightKg: 2.5 },
+    { id: "toiletries", name: "Toiletries starter kit (~1 month)", holdKey: "toiletries", category: "toiletries", weightKg: 1.0 },
+    { id: "stationery", name: "Stationery & textbooks", holdKey: "stationery and textbooks", category: "toiletries", weightKg: 2.0 },
+    { id: "forex", name: "Forex card + emergency USD cash", holdKey: "cash (usd)", category: "money", weightKg: 0.1 },
+  ];
+
+  CATS = [
+    ["documents", "Documents"], ["medicines", "Medicines & health"], ["clothing", "Clothing"],
+    ["kitchen", "Kitchen"], ["food", "Food"], ["electronics", "Electronics"],
+    ["bedding", "Bedding"], ["toiletries", "Toiletries & supplies"], ["money", "Money"],
+  ];
+
+  BAGS = [
+    { id: "bag1", label: "Checked Bag 1", limitKg: 23 },
+    { id: "bag2", label: "Checked Bag 2", limitKg: 23 },
+    { id: "cabin", label: "Cabin", limitKg: 7 },
+  ];
+
+  STEPS = [
+    { key: "name", type: "text", prompt: "Hi! I'm your Check-In agent. First — what should I call you?", placeholder: "Your name" },
+    { key: "city", type: "text", prompt: "Nice to meet you. Which university or city are you heading to?", placeholder: "e.g. UIUC, Champaign IL" },
+    { key: "intake", type: "choice", prompt: "When do you land — which intake?", options: [{ value: "fall", label: "Fall (Aug/Sep)" }, { value: "spring", label: "Spring (Jan)" }] },
+    { key: "climate", type: "choice", prompt: "How cold does it get where you're going? (A rough sense is fine.)", options: [{ value: "cold", label: "Cold / snowy winters" }, { value: "warm", label: "Mostly warm" }, { value: "mixed", label: "Mixed / not sure" }] },
+    { key: "housing", type: "choice", prompt: "Where will you live at first?", options: [{ value: "dorm", label: "On-campus dorm" }, { value: "apartment", label: "Off-campus apartment" }] },
+    { key: "diet", type: "choice", prompt: "Last one — how much will you cook?", options: [{ value: "veg-cooking-heavy", label: "I'll cook a lot" }, { value: "eats-out", label: "Mostly eat out / dining hall" }, { value: "mixed", label: "A mix" }] },
+  ];
+
+  profile = { name: "Aarav", city: "UIUC, Champaign IL", intake: "fall", climate: "cold", housing: "apartment", diet: "veg-cooking-heavy" };
+
+  state = {
+    screen: "landing",
+    listed: new Set(["passport","doc-copies","photos","rx","otc-kit","glasses","transit-jacket","thermals","heavy-coat","everyday-clothes","shoes","formal","ethnic","cooker","tava","kitchen-basics","spices","instant","snacks","rice-dal","laptop","phone","adapter","bedding","toiletries","stationery","forex"]),
+    expanded: "cooker",
+    bags: {
+      "everyday-clothes":"bag1","shoes":"bag1","rice-dal":"bag1","cooker":"bag1","spices":"bag1","bedding":"bag1","formal":"bag1","snacks":"bag1","heavy-coat":"bag1","instant":"bag1","thermals":"bag1","transit-jacket":"bag1",
+      "passport":"cabin","doc-copies":"cabin","photos":"cabin","rx":"cabin","otc-kit":"cabin","glasses":"cabin","phone":"cabin","adapter":"cabin","forex":"cabin","laptop":"cabin","toiletries":"cabin","kitchen-basics":"cabin",
+      "stationery":"bag2",
+    },
+    chatStep: 2,
+    chatHistory: [
+      { bot: "Hi! I'm your Check-In agent. First — what should I call you?", answer: "Aarav" },
+      { bot: "Nice to meet you. Which university or city are you heading to?", answer: "UIUC, Champaign IL" },
+    ],
+    chatText: "",
+    towerQuery: "",
+    towerAsked: "Should I bring a pressure cooker?",
+  };
+
+  go = (s) => { this.setState({ screen: s }); if (typeof window !== "undefined") window.scrollTo(0, 0); };
+  goLanding = () => this.go("landing");
+  goCheckin = () => this.go("checkin");
+  goManifest = () => this.go("manifest");
+  goWeighin = () => this.go("weighin");
+
+  toggleItem = (id) => this.setState((st) => { const n = new Set(st.listed); n.has(id) ? n.delete(id) : n.add(id); return { listed: n }; });
+  toggleWhy = (id) => this.setState((st) => ({ expanded: st.expanded === id ? null : id }));
+  assign = (id, bag) => this.setState((st) => ({ bags: { ...st.bags, [id]: bag } }));
+
+  chatCommit = (value, label) => {
+    const s = this.STEPS[this.state.chatStep];
+    this.setState((st) => ({ chatHistory: [...st.chatHistory, { bot: s.prompt, answer: label }], chatStep: st.chatStep + 1, chatText: "" }));
+  };
+  onChatInput = (e) => this.setState({ chatText: e.target.value });
+  onChatSubmit = (e) => { e.preventDefault(); const t = this.state.chatText.trim(); if (t) this.chatCommit(t, t); };
+
+  onTowerInput = (e) => this.setState({ towerQuery: e.target.value });
+  askTower = (q) => this.setState({ towerAsked: q.trim(), towerQuery: "" });
+  onTowerSubmit = (e) => { e.preventDefault(); const q = this.state.towerQuery.trim(); if (q) this.askTower(q); };
+
+  search(query) {
+    const q = (query || "").toLowerCase().trim();
+    if (!q) return [];
+    const terms = q.split(/\s+/).filter((t) => t.length > 2);
+    const scored = Object.keys(this.HOLD).map((item) => {
+      const h = this.HOLD[item];
+      const hay = (item + " " + h.detail).toLowerCase();
+      let score = 0;
+      for (const t of terms) if (hay.includes(t)) score += hay.includes(" " + t) ? 2 : 1;
+      if (item.toLowerCase().includes(q)) score += 5;
+      return { item, h, score };
+    });
+    return scored.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).slice(0, 4).map((s) => ({ item: s.item, ...s.h }));
+  }
+
+  personalNotes(h) {
+    const out = [];
+    const ctx = h.context || {};
+    const p = this.profile;
+    if (p.climate && ctx.climate && ctx.climate[p.climate]) out.push(ctx.climate[p.climate]);
+    if (p.intake && ctx.intake && ctx.intake[p.intake]) out.push(ctx.intake[p.intake]);
+    if (p.housing && ctx.housing && ctx.housing[p.housing]) out.push(ctx.housing[p.housing]);
+    if (p.diet && ctx.diet && ctx.diet[p.diet]) out.push(ctx.diet[p.diet]);
+    return out;
+  }
+
+  navStyle(active) {
+    const base = "height:34px;padding:0 12px;border:0;border-radius:7px;background:transparent;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;transition:color .15s,background .15s;";
+    return base + (active ? "color:#F5A623;background:rgba(245,166,35,.12);" : "color:#8FA3C4;");
+  }
+
+  renderVals() {
+    const { screen, listed, expanded, bags, chatHistory, chatStep, chatText, towerQuery, towerAsked } = this.state;
+    const V = this.V;
+
+    const navDefs = [["checkin","Check-In"],["manifest","Manifest"],["weighin","Weigh-In"],["tower","The Tower"]];
+    const navItems = navDefs.map(([k, label]) => ({ label, style: this.navStyle(screen === k), onClick: () => this.go(k) }));
+
+    // landing flights
+    const flightDefs = [
+      { flight: "CK 01", name: "CHECK-IN", dest: "Onboarding · build your profile", gate: "A1", status: "BOARDING", amber: true, screen: "checkin" },
+      { flight: "CK 02", name: "THE MANIFEST", dest: "Your packing checklist", gate: "B4", status: "ON TIME", amber: false, screen: "manifest" },
+      { flight: "CK 03", name: "WEIGH-IN", dest: "Bag weight lab", gate: "C2", status: "ON TIME", amber: false, screen: "weighin" },
+      { flight: "CK 04", name: "THE TOWER", dest: "Ask · community answers", gate: "D7", status: "ON TIME", amber: false, screen: "tower" },
+    ];
+    const flights = flightDefs.map((f) => ({ ...f, statusFg: f.amber ? "#F5A623" : "#4FCB8B", statusBg: f.amber ? "rgba(245,166,35,.15)" : "rgba(79,203,139,.14)", onClick: () => this.go(f.screen) }));
+
+    const featureCards = [
+      { name: "Check-In", flight: "CK 01", gate: "A1", blurb: "A quick, conversational profile — school, city, intake, housing — so every verdict is personalized to you.", screen: "checkin" },
+      { name: "The Manifest", flight: "CK 02", gate: "B4", blurb: "Your packing list with a clear verdict on each item: bring, buy, either, or skip — with the reasoning.", screen: "manifest" },
+      { name: "Weigh-In", flight: "CK 03", gate: "C2", blurb: "Assign items to your bags and watch live weight meters. Never discover you're 4 kg over at the counter.", screen: "weighin" },
+      { name: "The Tower", flight: "CK 04", gate: "D7", blurb: "Ask anything — customs, winter gear, kitchen kit — and get answers grounded in The Hold.", screen: "tower" },
+    ].map((f) => ({ ...f, onClick: () => this.go(f.screen) }));
+
+    const holdCount = Object.keys(this.HOLD).length;
+    const contestedCount = Object.values(this.HOLD).filter((h) => h.contested).length;
+
+    // manifest
+    const manifestGroups = this.CATS.map(([key, label]) => {
+      const items = this.PACKING.filter((p) => p.category === key).map((p) => {
+        const h = this.HOLD[p.holdKey] || {};
+        const v = V[h.verdict] || V.either;
+        const open = expanded === p.id;
+        return {
+          id: p.id, name: p.name, weightStr: p.weightKg.toFixed(1) + " kg",
+          listed: listed.has(p.id), open, whyLabel: open ? "Hide why" : "Why?",
+          vLabel: v.label, vFg: v.fg, vBg: v.bg, vBd: v.bd, contested: !!h.contested,
+          detail: h.detail || "", notes: this.personalNotes(h),
+          confidence: (h.confidence || "").toUpperCase(), sources: h.sources || 0,
+          onToggle: () => this.toggleItem(p.id), onWhy: () => this.toggleWhy(p.id),
+        };
+      });
+      return { key, label, items };
+    }).filter((g) => g.items.length);
+
+    // weigh-in
+    const byId = Object.fromEntries(this.PACKING.map((p) => [p.id, p]));
+    const listedIds = [...listed];
+    const colDefs = [{ id: undefined, title: "Unpacked", limit: null }, ...this.BAGS.map((b) => ({ id: b.id, title: b.label, limit: b.limitKg }))];
+    const weighCols = colDefs.map((c) => {
+      const items = listedIds.filter((id) => (bags[id] || undefined) === c.id).map((id) => {
+        const p = byId[id];
+        return { id, name: p.name, weightStr: p.weightKg.toFixed(1), currentBag: bags[id] || "", onDragStart: (e) => e.dataTransfer.setData("text/plain", id), onAssign: (e) => this.assign(id, e.target.value || undefined) };
+      });
+      const kg = items.reduce((s, it) => s + byId[it.id].weightKg, 0);
+      const limit = c.limit;
+      const over = limit != null && kg > limit;
+      const near = limit != null && !over && kg > limit * 0.9;
+      const color = over ? "#D23B2E" : near ? "#E0870B" : "#1B8F5A";
+      return {
+        title: c.title, showMeter: limit != null, kgStr: kg.toFixed(1), limitStr: limit != null ? limit + " kg" : "",
+        pct: limit != null ? Math.min(100, (kg / limit) * 100) : 0, color, numColor: over ? "#D23B2E" : "#9A917E",
+        msgShow: over, msg: over ? "Over by " + (kg - limit).toFixed(1) + " kg — offload something." : "",
+        items, empty: items.length === 0,
+        onDrop: (e) => { e.preventDefault(); const id = e.dataTransfer.getData("text/plain"); if (id) this.assign(id, c.id); },
+        onDragOver: (e) => e.preventDefault(),
+      };
+    });
+    const totalKg = listedIds.reduce((s, id) => s + (byId[id] ? byId[id].weightKg : 0), 0);
+    const unpackedCount = weighCols[0].items.length;
+
+    // check-in
+    const step = this.STEPS[chatStep];
+    const chatDone = chatStep >= this.STEPS.length;
+    const chatActive = !chatDone && !!step;
+    const currentOptions = chatActive && step.type === "choice" ? step.options.map((o) => ({ label: o.label, onClick: () => this.chatCommit(o.value, o.label) })) : [];
+    const progressPct = chatDone ? 100 : Math.round((chatStep / this.STEPS.length) * 100);
+
+    // tower
+    const towerResults = (towerAsked ? this.search(towerAsked) : []).map((h) => { const v = V[h.verdict] || V.either; return { item: h.item, vLabel: v.label, vFg: v.fg, vBg: v.bg, vBd: v.bd, contested: !!h.contested, detail: h.detail, confidence: (h.confidence || "").toUpperCase(), sources: h.sources || 0 }; });
+    const examples = ["Should I bring a pressure cooker?", "What about a winter jacket for a cold place?", "Can I carry rice and spices?", "What documents must I pack?"].map((t) => ({ text: t, onClick: () => this.askTower(t) }));
+
+    return {
+      isLanding: screen === "landing", isCheckin: screen === "checkin", isManifest: screen === "manifest", isWeighin: screen === "weighin", isTower: screen === "tower",
+      goLanding: this.goLanding, goCheckin: this.goCheckin, goManifest: this.goManifest, goWeighin: this.goWeighin,
+      navItems, flights, featureCards, holdCount, contestedCount,
+      // manifest
+      manifestGroups, listedCount: listed.size,
+      profileName: this.profile.name, profileCity: this.profile.city, profileIntake: this.profile.intake, profileHousing: this.profile.housing,
+      // weigh-in
+      weighCols, totalKgStr: totalKg.toFixed(1), unpackedCount,
+      // check-in
+      chatHistory, chatActive, chatDone, chatText,
+      currentPrompt: chatActive ? step.prompt : "", currentPlaceholder: chatActive ? (step.placeholder || "") : "",
+      stepIsText: chatActive && step.type === "text", stepIsChoice: chatActive && step.type === "choice",
+      currentOptions, stepNumber: chatStep + 1, totalSteps: this.STEPS.length, progressPct, doneName: this.profile.name,
+      onChatInput: this.onChatInput, onChatSubmit: this.onChatSubmit,
+      // tower
+      towerQuery, towerAsked, towerResults, towerEmpty: !!towerAsked && towerResults.length === 0,
+      showExamples: !towerAsked, examples, onTowerInput: this.onTowerInput, onTowerSubmit: this.onTowerSubmit,
+    };
+  }
+}
+</script>
+</body>
+</html>

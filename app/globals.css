@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * ─────────────────────────────────────────────────────────────
+ *  CHECKED — DESIGN TOKENS  (airport / boarding-pass theme)
+ *  Ported from "Airport-themed app design/Checked.dc.html".
+ *  Single source of truth for the look — re-skin by editing here
+ *  and the primitives in components/ui/. Fonts come from next/font
+ *  (--font-display / --font-sans / --font-mono set in layout.tsx).
+ * ─────────────────────────────────────────────────────────────
+ */
+:root {
+  /* warm-paper surfaces */
+  --paper: #ece6d8;        /* page background */
+  --ink: #14202e;          /* primary text (navy ink) */
+  --ink-muted: #6c6555;    /* body / secondary text */
+  --mono-muted: #9a917e;   /* mono eyebrow labels */
+  --card: #ffffff;
+  --card-border: #e4dccb;
+  --divider: #f0eadd;      /* row separators */
+  --panel: #f6f1e6;        /* weigh-in columns */
+  --field: #fbf9f3;        /* input surfaces */
+  --field-border: #ddd3c0;
+
+  /* brand */
+  --primary: #1466d8;
+  --primary-hover: #0f4fa8;
+  --accent: #f5a623;
+  --accent-ink: #1b1200;
+
+  /* dark "departures board" chrome */
+  --nav: #0d1626;
+  --nav-deep: #0a111e;
+  --nav-border: #1e2e48;
+  --nav-text: #f7f3ea;
+  --nav-muted: #5e77a0;
+
+  /* meters */
+  --good: #147a48;
+  --near: #f5a623;
+  --over: #d23b2e;
+
+  --radius: 14px;
+}
+
+* {
+  box-sizing: border-box;
+  border-color: var(--card-border);
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+::selection {
+  background: #f5a62333;
+}
+
+@keyframes ck-blink {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  61%,
+  100% {
+    opacity: 0.15;
+  }
+}
