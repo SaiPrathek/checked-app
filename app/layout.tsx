@@ -35,7 +35,7 @@ export default function RootLayout({
             {children}
           </main>
           <footer className="mx-auto max-w-[1120px] px-5 py-8 text-center font-mono text-[10px] uppercase tracking-[0.16em] text-mono-muted">
-            Checked · v0 · verdicts sourced from The Hold — corpus/README.md
+            Checked · checked.co.in · v0 · verdicts sourced from The Hold — corpus/README.md
           </footer>
         </AppProvider>
       </body>
