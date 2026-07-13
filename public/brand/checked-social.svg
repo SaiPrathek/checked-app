@@ -1,0 +1,20 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#0D1626"/>
+  <path d="M0 126H1200M0 504H1200" stroke="#1E2E48"/>
+  <path d="M930 0V630M1020 0V630M1110 0V630" stroke="#16243A"/>
+  <circle cx="1002" cy="84" r="5" fill="#F5A623"/>
+  <text x="1024" y="91" fill="#F5A623" font-family="monospace" font-size="20" letter-spacing="4">LIVE</text>
+
+  <g transform="translate(88 82) scale(1.75)">
+    <rect x="2" y="2" width="60" height="60" rx="15" fill="#F5A623"/>
+    <path d="M42 17.5C31.5 11.2 17.4 17.2 14.6 29.2C11.4 42.8 25.8 53.5 42 46.5" stroke="#0D1626" stroke-width="7" stroke-linecap="round"/>
+    <path d="M26 32.5L34 40.5L50.5 22" stroke="#FFF8E8" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <text x="88" y="276" fill="#F7F3EA" font-family="Arial, sans-serif" font-size="82" font-weight="700" letter-spacing="-2">Checked</text>
+  <text x="88" y="356" fill="#F5A623" font-family="Arial, sans-serif" font-size="48" font-weight="700">Everything, checked.</text>
+  <text x="88" y="416" fill="#A9BAD4" font-family="Arial, sans-serif" font-size="27">Pack smarter for your move from India to the US.</text>
+
+  <text x="88" y="548" fill="#7C90B0" font-family="monospace" font-size="18" letter-spacing="3">CHECK-IN  ·  THE MANIFEST  ·  WEIGH-IN  ·  THE TOWER</text>
+  <text x="1112" y="548" fill="#F7F3EA" font-family="monospace" font-size="18" text-anchor="end">checked.co.in</text>
+</svg>

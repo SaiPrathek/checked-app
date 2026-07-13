@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { LogoMark } from "@/components/logo";
 
 const LINKS = [
   { href: "/check-in", label: "Check-In" },
@@ -23,10 +24,8 @@ export function Nav() {
     <>
       <header className="sticky top-0 z-40 border-b border-nav-border bg-nav">
         <div className="mx-auto flex h-[60px] max-w-[1120px] items-center justify-between gap-3 px-5">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="grid h-[30px] w-[30px] place-items-center rounded-[7px] bg-accent text-[17px] font-bold text-accent-ink">
-              ✓
-            </span>
+          <Link href="/" className="flex items-center gap-2.5" aria-label="Checked home">
+            <LogoMark className="h-8 w-8 flex-shrink-0" />
             <span className="font-display text-[17px] font-bold tracking-[0.02em] text-nav-text">
               Checked
             </span>
@@ -34,7 +33,7 @@ export function Nav() {
               DEPARTURES
             </span>
           </Link>
-          <nav className="flex flex-wrap justify-end gap-0.5">
+          <nav className="hidden flex-wrap justify-end gap-0.5 sm:flex">
             {LINKS.map((l) => {
               const active = pathname === l.href;
               return (
@@ -54,6 +53,25 @@ export function Nav() {
             })}
           </nav>
         </div>
+        <nav className="flex items-center justify-between gap-1 overflow-x-auto border-t border-nav-border px-3 py-1.5 sm:hidden">
+          {LINKS.map((l) => {
+            const active = pathname === l.href;
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                className={cn(
+                  "flex-shrink-0 rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors",
+                  active
+                    ? "bg-nav-border text-nav-text"
+                    : "text-[#7c90b0] hover:text-nav-text",
+                )}
+              >
+                {l.label}
+              </Link>
+            );
+          })}
+        </nav>
       </header>
 
       <div className="border-b border-[#16233b] bg-nav-deep">

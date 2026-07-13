@@ -1,0 +1,27 @@
+{
+  "name": "Checked",
+  "short_name": "Checked",
+  "description": "A relocation copilot for Indian students moving to the US.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ECE6D8",
+  "theme_color": "#0D1626",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/brand/checked-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -25,7 +25,8 @@ export default function Home() {
       <section className="relative overflow-hidden rounded-[20px] border border-nav-border bg-nav px-[30px] pb-[34px] pt-[30px] shadow-[0_30px_60px_-30px_rgba(6,12,24,0.7)]">
         <div className="mb-[22px] flex items-center justify-between font-mono text-[11px] tracking-[0.2em] text-nav-muted">
           <span className="text-accent">▸ DEPARTURES</span>
-          <span>13 JUL 2026 · 09:41 IST</span>
+          <span className="hidden sm:inline">13 JUL 2026 · 09:41 IST</span>
+          <span className="text-[9px] sm:hidden">13 JUL · 09:41</span>
         </div>
         <h1 className="m-0 font-display text-[clamp(38px,7vw,74px)] font-bold leading-[0.98] tracking-[-0.02em] text-nav-text">
           Everything,
@@ -40,17 +41,17 @@ export default function Home() {
 
         {/* flight board */}
         <div className="mt-[26px] overflow-hidden rounded-xl border border-[#22344f]">
-          <div className="grid grid-cols-[78px_1fr_52px_108px] gap-2 bg-nav-deep px-4 py-[9px] font-mono text-[10px] tracking-[0.18em] text-nav-muted">
+          <div className="grid grid-cols-[62px_1fr_38px] gap-2 bg-nav-deep px-4 py-[9px] font-mono text-[9px] tracking-[0.12em] text-nav-muted sm:grid-cols-[78px_1fr_52px_108px] sm:text-[10px] sm:tracking-[0.18em]">
             <span>FLIGHT</span>
             <span>DESTINATION</span>
             <span>GATE</span>
-            <span className="text-right">STATUS</span>
+            <span className="hidden text-right sm:block">STATUS</span>
           </div>
           {FLIGHTS.map((f) => (
             <Link
               key={f.href}
               href={f.href}
-              className="grid grid-cols-[78px_1fr_52px_108px] items-center gap-2 border-t border-[#1a2942] px-4 py-[13px] font-mono"
+              className="grid grid-cols-[62px_1fr_38px] items-center gap-2 border-t border-[#1a2942] px-4 py-[13px] font-mono sm:grid-cols-[78px_1fr_52px_108px]"
             >
               <span className="text-[14px] font-medium tracking-[0.05em] text-accent">
                 {f.flight}
@@ -63,7 +64,7 @@ export default function Home() {
               </span>
               <span className="text-[13px] text-[#c7d4e8]">{f.gate}</span>
               <span
-                className="justify-self-end rounded-[5px] px-[9px] py-1 text-[10px] tracking-[0.14em]"
+                className="hidden justify-self-end rounded-[5px] px-[9px] py-1 text-[10px] tracking-[0.14em] sm:block"
                 style={{ color: f.fg, background: f.bg }}
               >
                 {f.status}
