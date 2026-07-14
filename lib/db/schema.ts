@@ -41,6 +41,8 @@ export const profiles = pgTable("profiles", {
   cooking: text("cooking"), // daily | weekly | rarely
   beverage: text("beverage"), // filter-coffee | chai | both | none
   diet: text("diet"), // legacy; retained for read-time migration
+  /** Weigh-In fleet: which bags are active, e.g. ["bag1","cabin","backpack"]. */
+  bagConfig: jsonb("bag_config"),
   completed: boolean("completed").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

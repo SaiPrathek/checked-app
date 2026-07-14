@@ -10,7 +10,14 @@ import {
   type ReactNode,
 } from "react";
 import { useUser } from "@clerk/nextjs";
-import { allocatedUnits, type Allocation, type BagId, type Profile } from "./types";
+import {
+  allocatedUnits,
+  orderBags,
+  DEFAULT_ACTIVE_BAGS,
+  type Allocation,
+  type BagId,
+  type Profile,
+} from "./types";
 import { PACKING_ITEMS } from "./packing-items";
 import { recommendedQty } from "./guidance";
 import { migrateProfile } from "./profile";
@@ -23,6 +30,7 @@ import {
   setQty as serverSetQty,
   importList,
 } from "./actions/list";
+import { getMyBagConfig, saveBagConfig } from "./actions/bags";
 
 interface AppState {
   profile: Profile;
@@ -32,6 +40,8 @@ interface AppState {
   qty: Record<string, number>;
   /** per-item, per-bag unit split; units not allocated are unpacked */
   alloc: Record<string, Allocation>;
+  /** the user's active Weigh-In fleet (ordered) */
+  activeBags: BagId[];
   hydrated: boolean;
   /** true when we've loaded state from the server (signed-in users only) */
   serverSynced: boolean;
@@ -47,6 +57,8 @@ interface AppState {
   setUnits: (id: string, bag: BagId, units: number) => void;
   /** apply a full Auto-Pack loadsheet in one go */
   applyLoadsheet: (allocMap: Record<string, Allocation>) => void;
+  /** add or remove a bag from the fleet; removing returns its units to the tray */
+  setBagActive: (id: BagId, active: boolean) => void;
   reset: () => void;
 }
 
@@ -58,6 +70,7 @@ interface Persisted {
   list: string[];
   qty: Record<string, number>;
   alloc: Record<string, Allocation>;
+  activeBags: BagId[];
 }
 
 /** Legacy persisted shape had bags: Record<itemId, BagId>. */
@@ -79,8 +92,21 @@ function migrateAlloc(parsed: {
   return out;
 }
 
+function sanitizeActiveBags(v: unknown): BagId[] {
+  if (!Array.isArray(v) || v.length === 0) return [...DEFAULT_ACTIVE_BAGS];
+  const ordered = orderBags(v as BagId[]);
+  return ordered.length ? ordered : [...DEFAULT_ACTIVE_BAGS];
+}
+
 function loadLocal(): Persisted {
-  if (typeof window === "undefined") return { profile: {}, list: [], qty: {}, alloc: {} };
+  const empty: Persisted = {
+    profile: {},
+    list: [],
+    qty: {},
+    alloc: {},
+    activeBags: [...DEFAULT_ACTIVE_BAGS],
+  };
+  if (typeof window === "undefined") return empty;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -90,12 +116,13 @@ function loadLocal(): Persisted {
         list: parsed.list ?? [],
         qty: parsed.qty ?? {},
         alloc: migrateAlloc(parsed),
+        activeBags: sanitizeActiveBags(parsed.activeBags),
       };
     }
   } catch {
     /* ignore */
   }
-  return { profile: {}, list: [], qty: {}, alloc: {} };
+  return empty;
 }
 
 /** Lookup by id — cheap enough that we don't need to memoize. */
@@ -105,7 +132,7 @@ const byId = new Map(PACKING_ITEMS.map((i) => [i.id, i]));
 function clampAlloc(a: Allocation, qty: number): Allocation {
   const out: Allocation = {};
   let used = 0;
-  for (const bag of ["cabin", "bag1", "bag2"] as BagId[]) {
+  for (const bag of ["cabin", "backpack", "bag1", "bag2"] as BagId[]) {
     const take = Math.min(Math.max(0, Math.floor(a[bag] ?? 0)), qty - used);
     if (take > 0) {
       out[bag] = take;
@@ -115,12 +142,31 @@ function clampAlloc(a: Allocation, qty: number): Allocation {
   return out;
 }
 
+/** Strip a removed bag out of every item's allocation (units → tray). */
+function stripBagFromAllocations(
+  allocMap: Record<string, Allocation>,
+  bag: BagId,
+): Record<string, Allocation> {
+  const next: Record<string, Allocation> = {};
+  for (const [id, a] of Object.entries(allocMap)) {
+    if (a[bag] === undefined) {
+      next[id] = a;
+      continue;
+    }
+    const copy = { ...a };
+    delete copy[bag];
+    next[id] = copy;
+  }
+  return next;
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn, user } = useUser();
   const [profile, setProfileState] = useState<Profile>({});
   const [list, setList] = useState<string[]>([]);
   const [qty, setQtyState] = useState<Record<string, number>>({});
   const [alloc, setAllocState] = useState<Record<string, Allocation>>({});
+  const [activeBags, setActiveBagsState] = useState<BagId[]>([...DEFAULT_ACTIVE_BAGS]);
   const [hydrated, setHydrated] = useState(false);
   const [serverSynced, setServerSynced] = useState(false);
 
@@ -134,6 +180,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setList(p.list);
     setQtyState(p.qty ?? {});
     setAllocState(p.alloc ?? {});
+    setActiveBagsState(p.activeBags);
     setHydrated(true);
   }, []);
 
@@ -149,9 +196,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     hydratedForUser.current = user.id;
 
     (async () => {
-      const [serverProfile, serverList] = await Promise.all([
+      const [serverProfile, serverList, serverBags] = await Promise.all([
         getMyProfile(),
         getMyList(),
+        getMyBagConfig(),
       ]);
 
       const local = loadLocal();
@@ -176,6 +224,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setQtyState(local.qty ?? {});
           setAllocState(local.alloc ?? {});
         }
+        // migrate the local fleet up if the user customized it
+        if (serverBags === null && local.activeBags.join() !== DEFAULT_ACTIVE_BAGS.join()) {
+          await saveBagConfig(local.activeBags);
+          setActiveBagsState(local.activeBags);
+        }
       } else {
         if (serverProfile) setProfileState(serverProfile);
         if (serverList.length) {
@@ -189,6 +242,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setQtyState(q);
           setAllocState(a);
         }
+        if (serverBags) setActiveBagsState(sanitizeActiveBags(serverBags));
       }
       setServerSynced(true);
     })().catch((e) => console.error("[Checked] server sync failed", e));
@@ -200,7 +254,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ profile, list, qty, alloc }),
+        JSON.stringify({ profile, list, qty, alloc, activeBags }),
       );
     } catch {
       /* ignore */
@@ -336,11 +390,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [isSignedIn],
   );
 
+  const setBagActive = useCallback(
+    (id: BagId, active: boolean) => {
+      setActiveBagsState((cur) => {
+        const has = cur.includes(id);
+        if (active === has) return cur;
+        let next: BagId[];
+        if (active) {
+          next = orderBags([...cur, id]);
+        } else {
+          if (cur.length <= 1) return cur; // keep at least one bag
+          next = cur.filter((b) => b !== id);
+          // removing a bag → its packed units go back to the tray
+          setAllocState((allocCur) => {
+            const stripped = stripBagFromAllocations(allocCur, id);
+            if (isSignedIn) {
+              serverSetAllocations(
+                Object.entries(stripped).map(([itemId, allocation]) => ({
+                  itemId,
+                  allocation,
+                })),
+              ).catch((e) => console.error("setAllocations", e));
+            }
+            return stripped;
+          });
+        }
+        if (isSignedIn) saveBagConfig(next).catch((e) => console.error("saveBagConfig", e));
+        return next;
+      });
+    },
+    [isSignedIn],
+  );
+
   const value: AppState = {
     profile,
     list,
     qty,
     alloc,
+    activeBags,
     hydrated,
     serverSynced,
     setProfile,
@@ -351,11 +438,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     assignBag,
     setUnits,
     applyLoadsheet,
+    setBagActive,
     reset: () => {
       setProfileState({});
       setList([]);
       setQtyState({});
       setAllocState({});
+      setActiveBagsState([...DEFAULT_ACTIVE_BAGS]);
     },
   };
 

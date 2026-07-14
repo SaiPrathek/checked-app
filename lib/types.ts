@@ -106,7 +106,7 @@ export type Allocation = Partial<Record<BagId, number>>;
 /** Total units of an item currently allocated across all bags. */
 export function allocatedUnits(a: Allocation | undefined): number {
   if (!a) return 0;
-  return (a.bag1 ?? 0) + (a.bag2 ?? 0) + (a.cabin ?? 0);
+  return (a.bag1 ?? 0) + (a.bag2 ?? 0) + (a.cabin ?? 0) + (a.backpack ?? 0);
 }
 
 export interface Profile {
@@ -127,10 +127,40 @@ export interface Profile {
   completed?: boolean;
 }
 
-export type BagId = "bag1" | "bag2" | "cabin";
+export type BagId = "bag1" | "bag2" | "cabin" | "backpack";
 
-export const BAGS: { id: BagId; label: string; limitKg: number }[] = [
-  { id: "bag1", label: "Checked Bag 1", limitKg: 23 },
-  { id: "bag2", label: "Checked Bag 2", limitKg: 23 },
-  { id: "cabin", label: "Cabin", limitKg: 7 },
+/** checked = goes in the hold (23 kg, no liquid/blade rules); cabin = carried on (7 kg, TSA rules apply). */
+export type BagClass = "checked" | "cabin";
+
+export interface BagDef {
+  id: BagId;
+  label: string;
+  limitKg: number;
+  class: BagClass;
+  /** false → always present and cannot be removed */
+  removable: boolean;
+}
+
+/** Every bag the app knows about. Which are *active* is per-user (see store.activeBags). */
+export const BAG_CATALOG: BagDef[] = [
+  { id: "bag1", label: "Checked Bag 1", limitKg: 23, class: "checked", removable: true },
+  { id: "bag2", label: "Checked Bag 2", limitKg: 23, class: "checked", removable: true },
+  { id: "cabin", label: "Cabin", limitKg: 7, class: "cabin", removable: true },
+  { id: "backpack", label: "Backpack", limitKg: 7, class: "cabin", removable: true },
 ];
+
+/** Default fleet for a new user: two checked bags + cabin (no backpack). */
+export const DEFAULT_ACTIVE_BAGS: BagId[] = ["bag1", "bag2", "cabin"];
+
+const BAG_DEF_BY_ID = new Map(BAG_CATALOG.map((b) => [b.id, b]));
+
+export function bagDef(id: BagId): BagDef {
+  const def = BAG_DEF_BY_ID.get(id);
+  if (!def) throw new Error(`unknown bag ${id}`);
+  return def;
+}
+
+/** Order bag ids in canonical display order (catalog order). */
+export function orderBags(ids: BagId[]): BagId[] {
+  return BAG_CATALOG.filter((b) => ids.includes(b.id)).map((b) => b.id);
+}

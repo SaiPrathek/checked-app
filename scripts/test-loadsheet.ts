@@ -3,15 +3,18 @@
  * Exits non-zero on any failure.
  */
 import { PACKING_ITEMS } from "@/lib/packing-items";
-import { computeLoadsheet, bagSpecsFrom, unitVolumeL, type LoadsheetLine } from "@/lib/loadsheet";
+import { computeLoadsheet, bagSpecsFrom, type LoadsheetLine } from "@/lib/loadsheet";
 import { allocatedUnits, type BagId } from "@/lib/types";
 
 const byId = new Map(PACKING_ITEMS.map((i) => [i.id, i]));
-const DIMS = {
+const DIMS: Record<BagId, { w: number; h: number; d: number }> = {
   bag1: { w: 71, h: 48, d: 30 },
   bag2: { w: 61, h: 43, d: 26 },
   cabin: { w: 55, h: 40, d: 20 },
+  backpack: { w: 45, h: 32, d: 20 },
 };
+const FULL: BagId[] = ["bag1", "bag2", "cabin"];
+const specs = (active: BagId[] = FULL) => bagSpecsFrom(active, DIMS);
 
 let failures = 0;
 function check(name: string, cond: boolean, detail = "") {
@@ -41,7 +44,7 @@ console.log("Scenario 1 · full realistic load");
     ["pickles-podis", 2], ["instant", 12], ["snacks", 3], ["rice-dal", 3],
     ["laptop", 1], ["phone", 1], ["adapter", 2], ["toiletries", 1], ["forex", 1],
   ]);
-  const r = computeLoadsheet(input, bagSpecsFrom(DIMS));
+  const r = computeLoadsheet(input, specs());
 
   // every unit placed
   const totalUnits = input.reduce((s, l) => s + l.qty, 0);
@@ -78,7 +81,7 @@ console.log("Scenario 2 · forced split of a multi-unit line");
 {
   // 30 kg of rice can't fit in one 23 kg bag → must split
   const input = lines([["rice-dal", 30]]);
-  const r = computeLoadsheet(input, bagSpecsFrom(DIMS));
+  const r = computeLoadsheet(input, specs());
   const a = r.alloc["rice-dal"] ?? {};
   check("split across both checked bags", (a.bag1 ?? 0) > 0 && (a.bag2 ?? 0) > 0,
     JSON.stringify(a));
@@ -91,7 +94,7 @@ console.log("Scenario 2 · forced split of a multi-unit line");
 console.log("Scenario 3 · genuine overflow → unplaced + warning");
 {
   const input = lines([["rice-dal", 60]]); // 60 kg into 23+23+7
-  const r = computeLoadsheet(input, bagSpecsFrom(DIMS));
+  const r = computeLoadsheet(input, specs());
   const placed = allocatedUnits(r.alloc["rice-dal"]);
   check("places up to capacity", placed >= 50 && placed <= 53, `placed ${placed}`);
   check("reports unplaced remainder", (r.unplaced[0]?.units ?? 0) === 60 - placed);
@@ -102,7 +105,7 @@ console.log("Scenario 3 · genuine overflow → unplaced + warning");
 console.log("Scenario 4 · cabin-banned overflow never leaks into cabin");
 {
   const input = lines([["rice-dal", 44], ["cooker", 3]]); // fills checked, cookers compete
-  const r = computeLoadsheet(input, bagSpecsFrom(DIMS));
+  const r = computeLoadsheet(input, specs());
   check("no cooker in cabin even under pressure", !r.alloc["cooker"]?.cabin,
     JSON.stringify(r.alloc["cooker"]));
 }
@@ -111,8 +114,8 @@ console.log("Scenario 4 · cabin-banned overflow never leaks into cabin");
 console.log("Scenario 5 · deterministic output");
 {
   const input = lines([["everyday-clothes", 14], ["shoes", 2], ["cooker", 1], ["laptop", 1]]);
-  const a = JSON.stringify(computeLoadsheet(input, bagSpecsFrom(DIMS)).alloc);
-  const b = JSON.stringify(computeLoadsheet(input, bagSpecsFrom(DIMS)).alloc);
+  const a = JSON.stringify(computeLoadsheet(input, specs()).alloc);
+  const b = JSON.stringify(computeLoadsheet(input, specs()).alloc);
   check("same input → same loadsheet", a === b);
 }
 
@@ -120,12 +123,55 @@ console.log("Scenario 5 · deterministic output");
 console.log("Scenario 6 · volume-limited packing");
 {
   // bedding is light (2.5kg) but bulky (12L): a tiny bag should refuse by volume
-  const tiny = bagSpecsFrom({ bag1: { w: 40, h: 30, d: 15 }, bag2: { w: 40, h: 30, d: 15 }, cabin: { w: 30, h: 20, d: 10 } });
+  const tiny = bagSpecsFrom(["bag1", "bag2", "cabin"], { ...DIMS, bag1: { w: 40, h: 30, d: 15 }, bag2: { w: 40, h: 30, d: 15 }, cabin: { w: 30, h: 20, d: 10 } });
   const input = lines([["bedding", 6]]); // 72L into ~15.3L bags
   const r = computeLoadsheet(input, tiny);
   const placed = allocatedUnits(r.alloc["bedding"]);
   check("volume caps placement", placed <= 2, `placed ${placed}`);
   check("unplaced reported", (r.unplaced[0]?.units ?? 0) === 6 - placed);
+}
+
+// ─── Scenario 7: backpack is cabin-class ─────────────────────────────────────
+console.log("Scenario 7 · backpack (cabin-class) fleet");
+{
+  const input = lines([
+    ["passport", 1], ["laptop", 1], ["phone", 1], ["forex", 1],
+    ["everyday-clothes", 14], ["cooker", 1], ["kitchen-basics", 1],
+  ]);
+  // fleet: 1 checked + cabin + backpack
+  const r = computeLoadsheet(input, specs(["bag1", "cabin", "backpack"]));
+  const mustInCabinClass = (id: string) => {
+    const a = r.alloc[id] ?? {};
+    return (a.cabin ?? 0) + (a.backpack ?? 0) > 0 && !a.bag1;
+  };
+  check("passport lands in a cabin-class bag", mustInCabinClass("passport"));
+  check("laptop lands in a cabin-class bag", mustInCabinClass("laptop"));
+  check("cooker NOT in cabin or backpack", !r.alloc["cooker"]?.cabin && !r.alloc["cooker"]?.backpack);
+  check("kitchen-basics (knife) NOT in backpack", !r.alloc["kitchen-basics"]?.backpack);
+  check("no bag2 allocations exist", !Object.values(r.alloc).some((a) => (a.bag2 ?? 0) > 0));
+  const placed = Object.values(r.alloc).reduce((s, a) => s + allocatedUnits(a), 0);
+  const total = input.reduce((s, l) => s + l.qty, 0);
+  check("all units placed with backpack fleet", placed === total, `${placed}/${total}`);
+}
+
+// ─── Scenario 8: single checked bag removed ──────────────────────────────────
+console.log("Scenario 8 · one checked bag only (bag2 removed)");
+{
+  const input = lines([["everyday-clothes", 14], ["shoes", 2], ["laptop", 1], ["passport", 1]]);
+  const r = computeLoadsheet(input, specs(["bag1", "cabin"]));
+  check("nothing allocated to removed bag2", !Object.values(r.alloc).some((a) => (a.bag2 ?? 0) > 0));
+  check("bag1 within limit", r.totals.bag1.kg <= 23 + 1e-9, `${r.totals.bag1.kg.toFixed(1)} kg`);
+  const placed = Object.values(r.alloc).reduce((s, a) => s + allocatedUnits(a), 0);
+  check("all units placed", placed === input.reduce((s, l) => s + l.qty, 0));
+}
+
+// ─── Scenario 9: no cabin bag → must-carry forced to checked with note ───────
+console.log("Scenario 9 · no cabin-class bag");
+{
+  const input = lines([["passport", 1], ["laptop", 1], ["everyday-clothes", 5]]);
+  const r = computeLoadsheet(input, specs(["bag1", "bag2"]));
+  check("must-carry items still placed (in checked)", allocatedUnits(r.alloc["passport"]) === 1 && allocatedUnits(r.alloc["laptop"]) === 1);
+  check("warns cabin bag is missing", r.notes.some((n) => n.text.toLowerCase().includes("cabin")));
 }
 
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} FAILURES`);

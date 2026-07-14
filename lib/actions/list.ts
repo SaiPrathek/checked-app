@@ -16,7 +16,7 @@ export interface ListRow {
 function cleanAllocation(a: Allocation | null | undefined, qty: number): Allocation {
   const out: Allocation = {};
   let used = 0;
-  for (const bag of ["cabin", "bag1", "bag2"] as BagId[]) {
+  for (const bag of ["cabin", "backpack", "bag1", "bag2"] as BagId[]) {
     const n = Math.max(0, Math.floor(a?.[bag] ?? 0));
     const take = Math.min(n, qty - used);
     if (take > 0) {

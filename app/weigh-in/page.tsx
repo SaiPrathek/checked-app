@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useApp } from "@/lib/store";
 import { PACKING_ITEMS } from "@/lib/packing-items";
 import {
-  BAGS,
-  allocatedUnits,
+  BAG_CATALOG,
+  bagDef,
   type BagId,
   type Category,
   type PackingItem,
@@ -38,6 +38,7 @@ interface BagConfig {
 }
 
 const PRESETS = [
+  { id: "backpack", label: "Backpack 45 cm", w: 45, h: 32, d: 20 },
   { id: "cabin", label: "Cabin 55 cm", w: 55, h: 40, d: 20 },
   { id: "medium", label: "Medium 24″", w: 61, h: 43, d: 26 },
   { id: "large", label: "Large 28″", w: 71, h: 48, d: 30 },
@@ -49,6 +50,7 @@ const DEFAULT_CONFIG: Record<BagId, BagConfig> = {
   bag1: { preset: "large", w: 71, h: 48, d: 30 },
   bag2: { preset: "medium", w: 61, h: 43, d: 26 },
   cabin: { preset: "cabin", w: 55, h: 40, d: 20 },
+  backpack: { preset: "backpack", w: 45, h: 32, d: 20 },
 };
 
 function rotationFor(id: string): number {
@@ -57,11 +59,26 @@ function rotationFor(id: string): number {
   return (hash % 13) - 6;
 }
 
+/** Units of an item sitting in currently-active bags (ignores stale allocations). */
+function activeAllocated(a: Record<string, number> | undefined, active: BagId[]): number {
+  if (!a) return 0;
+  return active.reduce((sum, bag) => sum + (a[bag] ?? 0), 0);
+}
+
 export default function WeighIn() {
-  const { list, alloc, qtyFor, assignBag, setUnits, applyLoadsheet, hydrated } =
-    useApp();
+  const {
+    list,
+    alloc,
+    activeBags,
+    qtyFor,
+    assignBag,
+    setUnits,
+    applyLoadsheet,
+    setBagActive,
+    hydrated,
+  } = useApp();
   const [view, setView] = useState<"case" | "classic">("case");
-  const [activeBag, setActiveBag] = useState<BagId>("bag1");
+  const [activeBagTab, setActiveBagTab] = useState<BagId>("bag1");
   const [bagConfig, setBagConfig] = useState<Record<BagId, BagConfig>>(DEFAULT_CONFIG);
   const [notes, setNotes] = useState<LoadsheetNote[] | null>(null);
 
@@ -74,14 +91,15 @@ export default function WeighIn() {
   );
 
   const { perBag, tray, violations, totalPackedKg } = useMemo(() => {
-    const perBag: Record<BagId, BagLine[]> = { bag1: [], bag2: [], cabin: [] };
+    const perBag: Record<string, BagLine[]> = {};
+    for (const b of activeBags) perBag[b] = [];
     const tray: BagLine[] = [];
     const violations: string[] = [];
     let totalPackedKg = 0;
     for (const item of items) {
       const qty = qtyFor(item.id);
       const a = alloc[item.id] ?? {};
-      for (const bagId of ["bag1", "bag2", "cabin"] as BagId[]) {
+      for (const bagId of activeBags) {
         const units = a[bagId] ?? 0;
         if (units <= 0) continue;
         perBag[bagId].push({
@@ -94,7 +112,7 @@ export default function WeighIn() {
         const warning = placementWarning(item, bagId);
         if (warning) violations.push(warning);
       }
-      const unassigned = qty - allocatedUnits(a);
+      const unassigned = qty - activeAllocated(a, activeBags);
       if (unassigned > 0) {
         tray.push({
           item,
@@ -105,7 +123,7 @@ export default function WeighIn() {
       }
     }
     return { perBag, tray, violations, totalPackedKg };
-  }, [items, alloc, qtyFor]);
+  }, [items, alloc, qtyFor, activeBags]);
 
   if (!hydrated) {
     return <p className="font-mono text-xs text-mono-muted">LOADING…</p>;
@@ -128,25 +146,24 @@ export default function WeighIn() {
     );
   }
 
-  const bag = BAGS.find((candidate) => candidate.id === activeBag) ?? BAGS[0];
-  const config = bagConfig[activeBag];
-  const packedLines = perBag[activeBag];
+  // the tab the config panel points at — fall back if its bag was removed
+  const currentBag: BagId = activeBags.includes(activeBagTab) ? activeBagTab : activeBags[0];
+  const def = bagDef(currentBag);
+  const config = bagConfig[currentBag];
+  const packedLines = perBag[currentBag] ?? [];
   const kg = packedLines.reduce((sum, line) => sum + line.kg, 0);
   const packedVolume = packedLines.reduce((sum, line) => sum + line.volL, 0);
   const capacity = ((config.w * config.h * config.d) / 1000) * 0.85;
-  const weightOver = kg > bag.limitKg;
+  const weightOver = kg > def.limitKg;
   const volumeOver = packedVolume > capacity;
   const caseW = Math.round(Math.min(320, Math.max(120, config.w * 3.4)));
   const caseH = Math.round(Math.min(320, Math.max(120, config.h * 3.6)));
 
+  const inactiveBags = BAG_CATALOG.filter((b) => !activeBags.includes(b.id));
+
   function runAutoPack() {
     const lines = items.map((item) => ({ item, qty: qtyFor(item.id) }));
-    const dims = {
-      bag1: bagConfig.bag1,
-      bag2: bagConfig.bag2,
-      cabin: bagConfig.cabin,
-    };
-    const result = computeLoadsheet(lines, bagSpecsFrom(dims));
+    const result = computeLoadsheet(lines, bagSpecsFrom(activeBags, bagConfig));
     applyLoadsheet(result.alloc);
     setNotes(result.notes);
   }
@@ -155,16 +172,16 @@ export default function WeighIn() {
     const preset = PRESETS.find((candidate) => candidate.id === presetId);
     setBagConfig((current) => ({
       ...current,
-      [activeBag]: preset && "w" in preset
+      [currentBag]: preset && "w" in preset
         ? { preset: presetId, w: preset.w, h: preset.h, d: preset.d }
-        : { ...current[activeBag], preset: presetId },
+        : { ...current[currentBag], preset: presetId },
     }));
   }
 
   function setDimension(key: "w" | "h" | "d", value: number) {
     setBagConfig((current) => ({
       ...current,
-      [activeBag]: { ...current[activeBag], preset: "custom", [key]: value },
+      [currentBag]: { ...current[currentBag], preset: "custom", [key]: value },
     }));
   }
 
@@ -183,7 +200,7 @@ export default function WeighIn() {
           </div>
           <h1 className="m-0 font-display text-[34px] font-bold tracking-[-0.02em]">Weigh-In</h1>
           <p className="mt-1.5 max-w-[520px] text-[14.5px] text-ink-muted">
-            Hit Auto-Pack to get an optimal, rule-aware loadsheet — or pack by hand. Tap items to move them; the meters track weight and space live.
+            Set your fleet, then hit Auto-Pack for an optimal, rule-aware loadsheet — or pack by hand. The meters track weight and space live.
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -199,6 +216,45 @@ export default function WeighIn() {
             <div className="font-mono text-[10px] tracking-[0.16em] text-mono-muted">TOTAL PACKED</div>
           </div>
         </div>
+      </div>
+
+      {/* fleet manager */}
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-card-border bg-card px-4 py-3">
+        <span className="mr-1 font-mono text-[10px] tracking-[0.16em] text-mono-muted">FLEET</span>
+        {activeBags.map((id) => {
+          const bag = bagDef(id);
+          const canRemove = bag.removable && activeBags.length > 1;
+          return (
+            <span
+              key={id}
+              className="flex items-center gap-1.5 rounded-full border border-field-border bg-field py-1 pl-3 pr-1.5 text-[12.5px] font-semibold text-ink"
+            >
+              {bag.label}
+              <span className="font-mono text-[10px] font-normal text-mono-muted">{bag.limitKg}kg</span>
+              {canRemove && (
+                <button
+                  type="button"
+                  aria-label={`Remove ${bag.label}`}
+                  title={`Remove ${bag.label}`}
+                  onClick={() => setBagActive(id, false)}
+                  className="grid h-5 w-5 place-items-center rounded-full text-mono-muted hover:bg-[#fbe8e5] hover:text-[#b23127]"
+                >
+                  ✕
+                </button>
+              )}
+            </span>
+          );
+        })}
+        {inactiveBags.map((bag) => (
+          <button
+            key={bag.id}
+            type="button"
+            onClick={() => setBagActive(bag.id, true)}
+            className="flex items-center gap-1.5 rounded-full border border-dashed border-field-border bg-transparent px-3 py-1 text-[12.5px] font-semibold text-ink-muted hover:border-accent hover:text-[#9a5b00]"
+          >
+            + {bag.label}
+          </button>
+        ))}
       </div>
 
       {notes && notes.length > 0 && (
@@ -247,30 +303,31 @@ export default function WeighIn() {
 
       {view === "case" ? (
         <div className="flex flex-col gap-5">
-          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Suitcases">
-            {BAGS.map((candidate) => {
-              const bagKg = perBag[candidate.id].reduce((sum, line) => sum + line.kg, 0);
-              const active = activeBag === candidate.id;
-              const over = bagKg > candidate.limitKg;
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Bags">
+            {activeBags.map((id) => {
+              const bag = bagDef(id);
+              const bagKg = (perBag[id] ?? []).reduce((sum, line) => sum + line.kg, 0);
+              const active = currentBag === id;
+              const over = bagKg > bag.limitKg;
               return (
                 <button
-                  key={candidate.id}
+                  key={id}
                   type="button"
                   role="tab"
                   aria-selected={active}
-                  onClick={() => setActiveBag(candidate.id)}
+                  onClick={() => setActiveBagTab(id)}
                   className={active
                     ? "h-10 rounded-full border border-nav-deep bg-ink px-4 text-[13.5px] font-semibold text-nav-text"
                     : "h-10 rounded-full border border-field-border bg-card px-4 text-[13.5px] font-semibold text-ink-muted"}
                 >
-                  {candidate.label}
+                  {bag.label}
                   <span className={over
                     ? "ml-2 font-mono text-[10.5px] text-[#f08a7f]"
                     : active
                       ? "ml-2 font-mono text-[10.5px] text-accent"
                       : "ml-2 font-mono text-[10.5px] text-mono-muted"}
                   >
-                    {bagKg.toFixed(1)}/{candidate.limitKg} kg
+                    {bagKg.toFixed(1)}/{bag.limitKg} kg
                   </span>
                 </button>
               );
@@ -286,7 +343,7 @@ export default function WeighIn() {
                 </span>
               </div>
               <p className="m-0 text-[12.5px] text-ink-muted">
-                Tap an item to pack it into <strong>{bag.label}</strong>. Tap a packed item to take it back out.
+                Tap an item to pack it into <strong>{def.label}</strong>. Tap a packed item to take it back out.
               </p>
               {tray.length > 0 ? (
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(118px,1fr))] gap-2">
@@ -294,12 +351,12 @@ export default function WeighIn() {
                     <button
                       key={line.item.id}
                       type="button"
-                      title={`Pack into ${bag.label}`}
+                      title={`Pack into ${def.label}`}
                       onClick={() =>
                         setUnits(
                           line.item.id,
-                          activeBag,
-                          (alloc[line.item.id]?.[activeBag] ?? 0) + line.units,
+                          currentBag,
+                          (alloc[line.item.id]?.[currentBag] ?? 0) + line.units,
                         )
                       }
                       className="relative flex flex-col items-center gap-1.5 rounded-[10px] border border-card-border bg-card px-2 py-2.5"
@@ -324,7 +381,7 @@ export default function WeighIn() {
 
             <section className="flex min-w-0 flex-col gap-4 rounded-2xl border border-card-border bg-card p-5 shadow-[0_12px_26px_-24px_rgba(20,26,38,0.5)]">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="mr-1 font-mono text-[10px] tracking-[0.16em] text-mono-muted">LUGGAGE</span>
+                <span className="mr-1 font-mono text-[10px] tracking-[0.16em] text-mono-muted">SIZE</span>
                 {PRESETS.map((preset) => (
                   <button
                     key={preset.id}
@@ -367,7 +424,7 @@ export default function WeighIn() {
                             key={line.item.id}
                             type="button"
                             title={`${line.item.name}${line.units > 1 ? ` ×${line.units}` : ""} · ${line.kg.toFixed(1)} kg — tap to unpack`}
-                            onClick={() => setUnits(line.item.id, activeBag, 0)}
+                            onClick={() => setUnits(line.item.id, currentBag, 0)}
                             className="relative grid place-items-center rounded-lg border-2 border-card-border bg-card animate-[ck-drop_.45s_cubic-bezier(.2,.8,.3,1.15)]"
                             style={{ width: size, height: size, transform: `rotate(${rotationFor(line.item.id)}deg)` }}
                           >
@@ -391,19 +448,19 @@ export default function WeighIn() {
                     <span className="h-4 w-4 rounded-full bg-nav-deep" />
                   </div>
                   <div className="mt-3 font-mono text-[10.5px] tracking-[0.12em] text-mono-muted">
-                    {config.w} × {config.h} × {config.d} cm · {Math.round(capacity)} L usable
+                    {def.label} · {config.w} × {config.h} × {config.d} cm · {Math.round(capacity)} L usable
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
-                <Metric label="WEIGHT" value={kg} limit={bag.limitKg} unit="kg" />
+                <Metric label="WEIGHT" value={kg} limit={def.limitKg} unit="kg" />
                 <Metric label="SPACE" value={packedVolume} limit={capacity} unit="L" round />
               </div>
               {(weightOver || volumeOver) && (
                 <p className="m-0 text-[13px] font-semibold text-over">
                   {weightOver
-                    ? `Over the airline limit by ${(kg - bag.limitKg).toFixed(1)} kg — take something out.`
+                    ? `Over the airline limit by ${(kg - def.limitKg).toFixed(1)} kg — take something out.`
                     : "Out of space — pick a bigger case or unpack something."}
                 </p>
               )}
@@ -418,23 +475,28 @@ export default function WeighIn() {
             onDrop={(event) => onDrop(event, undefined)}
             onMoveAll={assignBag}
             bagId=""
+            activeBags={activeBags}
             setUnits={setUnits}
             qtyFor={qtyFor}
           />
-          {BAGS.map((candidate) => (
-            <ClassicColumn
-              key={candidate.id}
-              title={candidate.label}
-              lines={perBag[candidate.id]}
-              limitKg={candidate.limitKg}
-              config={bagConfig[candidate.id]}
-              onDrop={(event) => onDrop(event, candidate.id)}
-              onMoveAll={assignBag}
-              bagId={candidate.id}
-              setUnits={setUnits}
-              qtyFor={qtyFor}
-            />
-          ))}
+          {activeBags.map((id) => {
+            const bag = bagDef(id);
+            return (
+              <ClassicColumn
+                key={id}
+                title={bag.label}
+                lines={perBag[id] ?? []}
+                limitKg={bag.limitKg}
+                config={bagConfig[id]}
+                onDrop={(event) => onDrop(event, id)}
+                onMoveAll={assignBag}
+                bagId={id}
+                activeBags={activeBags}
+                setUnits={setUnits}
+                qtyFor={qtyFor}
+              />
+            );
+          })}
         </div>
       )}
     </div>
@@ -474,6 +536,7 @@ function ClassicColumn({
   onDrop,
   onMoveAll,
   bagId,
+  activeBags,
   setUnits,
   qtyFor,
 }: {
@@ -484,6 +547,7 @@ function ClassicColumn({
   onDrop: (event: React.DragEvent) => void;
   onMoveAll: (id: string, bag: BagId | undefined) => void;
   bagId: BagId | "";
+  activeBags: BagId[];
   setUnits: (id: string, bag: BagId, units: number) => void;
   qtyFor: (id: string) => number;
 }) {
@@ -516,7 +580,12 @@ function ClassicColumn({
                   <button type="button" aria-label={`More ${line.item.name} in ${title}`} onClick={() => setUnits(line.item.id, bagId, line.units + 1)} className="grid h-6 w-6 place-items-center rounded border border-field-border bg-field hover:bg-divider">+</button>
                 </div>
               )}
-              <select value={bagId} onChange={(event) => onMoveAll(line.item.id, (event.target.value || undefined) as BagId | undefined)} className="mt-[7px] w-full cursor-pointer rounded-md border border-card-border bg-field px-2 py-1 font-mono text-[10.5px] text-ink-muted" aria-label={`Move all ${line.item.name}`}><option value="">◦ Unpacked (all)</option><option value="bag1">→ Checked Bag 1 (all)</option><option value="bag2">→ Checked Bag 2 (all)</option><option value="cabin">→ Cabin (all)</option></select>
+              <select value={bagId} onChange={(event) => onMoveAll(line.item.id, (event.target.value || undefined) as BagId | undefined)} className="mt-[7px] w-full cursor-pointer rounded-md border border-card-border bg-field px-2 py-1 font-mono text-[10.5px] text-ink-muted" aria-label={`Move all ${line.item.name}`}>
+                <option value="">◦ Unpacked (all)</option>
+                {activeBags.map((id) => (
+                  <option key={id} value={id}>→ {bagDef(id).label} (all)</option>
+                ))}
+              </select>
             </div>
           );
         })}
