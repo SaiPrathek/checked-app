@@ -25,16 +25,26 @@ export function resolveGuidance(hold: HoldItem, profile: Profile): ResolvedGuida
   if (profile.housing && ctx.housing?.[profile.housing]) {
     personalNotes.push(ctx.housing[profile.housing]);
   }
-  if (profile.diet && ctx.diet?.[profile.diet]) {
-    personalNotes.push(ctx.diet[profile.diet]);
-  }
+  if (profile.roommates && ctx.roommates?.[profile.roommates])
+    personalNotes.push(ctx.roommates[profile.roommates]);
+  if (profile.dietPractice && ctx.dietPractice?.[profile.dietPractice])
+    personalNotes.push(ctx.dietPractice[profile.dietPractice]);
+  if (profile.cuisine && ctx.cuisine?.[profile.cuisine])
+    personalNotes.push(ctx.cuisine[profile.cuisine]);
+  if (profile.cooking && ctx.cooking?.[profile.cooking])
+    personalNotes.push(ctx.cooking[profile.cooking]);
+  if (profile.beverage && ctx.beverage?.[profile.beverage])
+    personalNotes.push(ctx.beverage[profile.beverage]);
+  if (profile.gender && ctx.gender?.[profile.gender])
+    personalNotes.push(ctx.gender[profile.gender]);
 
   return { verdict: hold.verdict, personalNotes };
 }
 
 /**
  * Recommended quantity for a packing item given the user's profile.
- * Precedence: climate → intake → housing → diet → baseQty → 1.
+ * Precedence: climate → intake → housing → roommates → diet practice → cuisine
+ * → cooking → beverage → gender → baseQty → 1.
  * The user's UI value in the store overrides this whenever set.
  */
 export function recommendedQty(item: PackingItem, profile: Profile): number {
@@ -46,10 +56,28 @@ export function recommendedQty(item: PackingItem, profile: Profile): number {
       return q.intake[profile.intake]!;
     if (profile.housing && q.housing?.[profile.housing] !== undefined)
       return q.housing[profile.housing]!;
-    if (profile.diet && q.diet?.[profile.diet] !== undefined)
-      return q.diet[profile.diet]!;
+    if (profile.roommates && q.roommates?.[profile.roommates] !== undefined)
+      return q.roommates[profile.roommates]!;
+    if (profile.dietPractice && q.dietPractice?.[profile.dietPractice] !== undefined)
+      return q.dietPractice[profile.dietPractice]!;
+    if (profile.cuisine && q.cuisine?.[profile.cuisine] !== undefined)
+      return q.cuisine[profile.cuisine]!;
+    if (profile.cooking && q.cooking?.[profile.cooking] !== undefined)
+      return q.cooking[profile.cooking]!;
+    if (profile.beverage && q.beverage?.[profile.beverage] !== undefined)
+      return q.beverage[profile.beverage]!;
+    if (profile.gender && q.gender?.[profile.gender] !== undefined)
+      return q.gender[profile.gender]!;
   }
   return item.baseQty ?? 1;
+}
+
+export function isItemVisible(item: PackingItem, profile: Profile): boolean {
+  return item.visibleIf ? item.visibleIf(profile) : true;
+}
+
+export function itemName(item: PackingItem, profile: Profile): string {
+  return item.nameFor?.(profile) ?? item.name;
 }
 
 /** Naive local retrieval over The Hold for The Tower (routed-RAG placeholder). */

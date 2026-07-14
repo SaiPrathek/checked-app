@@ -29,10 +29,18 @@ export const profiles = pgTable("profiles", {
   name: text("name"),
   university: text("university"),
   city: text("city"),
+  state: text("state"),
+  region: text("region"), // northeast | midwest | south | west
   climate: text("climate"), // cold | warm | mixed
   intake: text("intake"), // fall | spring
   housing: text("housing"), // dorm | apartment
-  diet: text("diet"), // veg-cooking-heavy | eats-out | mixed
+  roommates: text("roommates"), // alone | roommates
+  gender: text("gender"), // male | female | nonbinary | na
+  dietPractice: text("diet_practice"), // veg | jain | halal | eggetarian | none
+  cuisine: text("cuisine"), // south | north | west | east
+  cooking: text("cooking"), // daily | weekly | rarely
+  beverage: text("beverage"), // filter-coffee | chai | both | none
+  diet: text("diet"), // legacy; retained for read-time migration
   completed: boolean("completed").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -88,6 +96,7 @@ export const holdItems = pgTable("hold_items", {
   context: jsonb("context"),
   support: jsonb("support"),
   claimIds: jsonb("claim_ids"),
+  tags: jsonb("tags"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -6,8 +6,10 @@ import { useUser } from "@clerk/nextjs";
 import { useApp } from "@/lib/store";
 import { PACKING_ITEMS } from "@/lib/packing-items";
 import { getHoldItem } from "@/lib/hold";
-import { resolveGuidance } from "@/lib/guidance";
-import type { Category, PackingItem } from "@/lib/types";
+import { isItemVisible, itemName, recommendedQty, resolveGuidance } from "@/lib/guidance";
+import { CLIMATE_LABELS } from "@/lib/climate";
+import { PROFILE_LABELS } from "@/lib/profile";
+import type { Category, PackingItem, Profile } from "@/lib/types";
 import { VerdictBadge } from "@/components/ui/verdict-badge";
 import { CommunityStat } from "@/components/ui/community-stat";
 import { QtyStepper } from "@/components/ui/qty-stepper";
@@ -52,15 +54,26 @@ export default function Manifest() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [stats, setStats] = useState<Map<string, Stat>>(new Map());
 
+  const visibleItems = useMemo(
+    () => PACKING_ITEMS.filter((item) => isItemVisible(item, profile)),
+    [profile],
+  );
+
   const grouped = useMemo(() => {
     const map = new Map<Category, PackingItem[]>();
-    for (const it of PACKING_ITEMS) {
+    for (const it of visibleItems) {
+      if (recommendedQty(it, profile) === 0 && !list.includes(it.id)) continue;
       const arr = map.get(it.category) ?? [];
       arr.push(it);
       map.set(it.category, arr);
     }
     return map;
-  }, []);
+  }, [list, profile, visibleItems]);
+
+  const notNeeded = useMemo(
+    () => visibleItems.filter((item) => recommendedQty(item, profile) === 0 && !list.includes(item.id)),
+    [list, profile, visibleItems],
+  );
 
   // Community stats are public — fetch for every visitor.
   useEffect(() => {
@@ -130,6 +143,35 @@ export default function Manifest() {
         </div>
       </div>
 
+      {profile.completed && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-card-border bg-[#f6f1e6] px-4 py-3">
+          <span className="mr-1 font-mono text-[10px] font-bold tracking-[0.14em] text-mono-muted">
+            TUNED FOR
+          </span>
+          <ProfileChip
+            href="/check-in?edit=university"
+            label={profile.city && profile.state
+              ? `${profile.city}, ${profile.state}${profile.climate ? ` · ${CLIMATE_LABELS[profile.climate]}` : ""}`
+              : profile.university || "Destination"}
+          />
+          {profile.dietPractice && (
+            <ProfileChip href="/check-in?edit=dietPractice" label={PROFILE_LABELS.dietPractice[profile.dietPractice]} />
+          )}
+          {profile.cuisine && (
+            <ProfileChip href="/check-in?edit=cuisine" label={PROFILE_LABELS.cuisine[profile.cuisine]} />
+          )}
+          {profile.housing && (
+            <ProfileChip
+              href="/check-in?edit=housing"
+              label={`${profile.housing === "dorm" ? "Dorm" : "Apartment"}${profile.roommates === "roommates" ? " · roommates" : profile.roommates === "alone" ? " · solo" : ""}`}
+            />
+          )}
+          {profile.cooking && (
+            <ProfileChip href="/check-in?edit=cooking" label={`Cooks ${PROFILE_LABELS.cooking[profile.cooking].toLowerCase()}`} />
+          )}
+        </div>
+      )}
+
       {isSignedIn && list.length > 0 && (
         <Link
           href="/debrief"
@@ -158,99 +200,50 @@ export default function Manifest() {
               {CATEGORY_LABEL[cat]}
             </h2>
             <div className="overflow-hidden rounded-[14px] border border-card-border bg-card shadow-[0_12px_26px_-24px_rgba(20,26,38,0.5)]">
-              {items.map((it, idx) => {
-                const hold = getHoldItem(it.holdKey);
-                if (!hold) return null;
-                const guidance = resolveGuidance(hold, profile);
-                const open = expanded === it.id;
-                return (
-                  <div
-                    key={it.id}
-                    className={idx === 0 ? "p-4" : "border-t border-divider p-4"}
-                  >
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        checked={isListed(it.id)}
-                        onChange={() => toggleListItem(it.id)}
-                        className="mt-[3px] h-[17px] w-[17px] flex-shrink-0 cursor-pointer accent-primary"
-                        aria-label={`Add ${it.name} to my list`}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span className="text-[15px] font-semibold">
-                            {it.name}
-                          </span>
-                          <span className="font-mono text-[11px] text-mono-muted">
-                            {it.weightKg.toFixed(1)} kg
-                            {isListed(it.id) && qtyFor(it.id) > 1 && (
-                              <> · {(it.weightKg * qtyFor(it.id)).toFixed(1)} total</>
-                            )}
-                          </span>
-                        </div>
-                        {isListed(it.id) && (
-                          <div className="mt-2 flex items-center gap-2">
-                            <QtyStepper
-                              value={qtyFor(it.id)}
-                              onChange={(n) => setQtyForItem(it.id, n)}
-                              label={`Quantity of ${it.name}`}
-                            />
-                            <span className="font-mono text-[10.5px] uppercase tracking-[0.1em] text-mono-muted">
-                              QTY
-                            </span>
-                          </div>
-                        )}
-                        <button
-                          onClick={() => setExpanded(open ? null : it.id)}
-                          className="mt-[6px] text-[12.5px] text-mono-muted underline underline-offset-2"
-                        >
-                          {open ? "Hide why" : "Why?"}
-                        </button>
-                        {open && (
-                          <div className="mt-2.5 flex flex-col gap-2 border-l-2 border-[#eadfcb] pl-3">
-                            <p className="m-0 text-[13.5px] leading-[1.55] text-ink-muted">
-                              {hold.detail}
-                            </p>
-                            {guidance.personalNotes.map((n, i) => (
-                              <p
-                                key={i}
-                                className="m-0 text-[13.5px] leading-[1.5] text-ink"
-                              >
-                                <span className="font-bold text-primary">
-                                  For you:
-                                </span>{" "}
-                                {n}
-                              </p>
-                            ))}
-                            {hold.price?.note && (
-                              <p className="m-0 text-[12.5px] text-ink-muted">
-                                💰 {hold.price.note}
-                              </p>
-                            )}
-                            <p className="m-0 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#a79e8b]">
-                              Confidence {hold.confidence}
-                              {hold.claimIds?.length
-                                ? ` · ${hold.claimIds.length} source${hold.claimIds.length > 1 ? "s" : ""} in The Hold`
-                                : ""}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
-                        <VerdictBadge
-                          verdict={guidance.verdict}
-                          contested={hold.contested}
-                        />
-                        <CommunityStat stat={stats.get(it.holdKey)} />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {items.map((it, idx) => (
+                <ManifestRow
+                  key={it.id}
+                  item={it}
+                  profile={profile}
+                  first={idx === 0}
+                  listed={isListed(it.id)}
+                  qty={qtyFor(it.id)}
+                  open={expanded === it.id}
+                  stat={stats.get(it.holdKey)}
+                  onToggle={() => toggleListItem(it.id)}
+                  onQty={(qty) => setQtyForItem(it.id, qty)}
+                  onOpen={() => setExpanded(expanded === it.id ? null : it.id)}
+                />
+              ))}
             </div>
           </section>
         );
       })}
+
+      {notNeeded.length > 0 && (
+        <details className="overflow-hidden rounded-[14px] border border-card-border bg-[#f6f1e6]">
+          <summary className="cursor-pointer px-4 py-3.5 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-mono-muted">
+            Not needed for you · {notNeeded.length} item{notNeeded.length === 1 ? "" : "s"}
+          </summary>
+          <div className="border-t border-card-border bg-card opacity-70">
+            {notNeeded.map((it, idx) => (
+              <ManifestRow
+                key={it.id}
+                item={it}
+                profile={profile}
+                first={idx === 0}
+                listed={false}
+                qty={0}
+                open={expanded === it.id}
+                stat={stats.get(it.holdKey)}
+                onToggle={() => toggleListItem(it.id)}
+                onQty={(qty) => setQtyForItem(it.id, qty)}
+                onOpen={() => setExpanded(expanded === it.id ? null : it.id)}
+              />
+            ))}
+          </div>
+        </details>
+      )}
 
       <div className="sticky bottom-4 mx-auto flex w-full max-w-[440px] items-center justify-between gap-3 rounded-full border border-[#22344f] bg-nav py-2.5 pl-5 pr-3 shadow-[0_18px_34px_-20px_rgba(6,12,24,0.7)]">
         <span className="text-[14px] text-[#e7edf7]">
@@ -266,6 +259,104 @@ export default function Manifest() {
         >
           Weigh-In →
         </Link>
+      </div>
+    </div>
+  );
+}
+
+function ProfileChip({ href, label }: { href: string; label: string }) {
+  return (
+    <Link href={href} className="rounded-full border border-field-border bg-card px-3 py-1.5 text-[12px] font-semibold text-ink transition-colors hover:border-primary hover:text-primary">
+      {label} ↗
+    </Link>
+  );
+}
+
+function ManifestRow({
+  item,
+  profile,
+  first,
+  listed,
+  qty,
+  open,
+  stat,
+  onToggle,
+  onQty,
+  onOpen,
+}: {
+  item: PackingItem;
+  profile: Profile;
+  first: boolean;
+  listed: boolean;
+  qty: number;
+  open: boolean;
+  stat?: Stat;
+  onToggle: () => void;
+  onQty: (qty: number) => void;
+  onOpen: () => void;
+}) {
+  const hold = getHoldItem(item.holdKey);
+  if (!hold) return null;
+  const guidance = resolveGuidance(hold, profile);
+  const displayName = itemName(item, profile);
+  const coordinate = item.shareable && profile.roommates === "roommates";
+
+  return (
+    <div className={first ? "p-4" : "border-t border-divider p-4"}>
+      <div className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          checked={listed}
+          onChange={onToggle}
+          className="mt-[3px] h-[17px] w-[17px] flex-shrink-0 cursor-pointer accent-primary"
+          aria-label={`Add ${displayName} to my list`}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="text-[15px] font-semibold">{displayName}</span>
+            <span className="font-mono text-[11px] text-mono-muted">
+              {item.weightKg.toFixed(1)} kg
+              {listed && qty > 1 && <> · {(item.weightKg * qty).toFixed(1)} total</>}
+            </span>
+          </div>
+          {coordinate && (
+            <span className="mt-1.5 inline-flex rounded-full border border-[#b9d8ca] bg-[#edf7f1] px-2.5 py-1 text-[11px] font-semibold text-good">
+              🤝 coordinate with roommates
+            </span>
+          )}
+          {listed && !coordinate && (
+            <div className="mt-2 flex items-center gap-2">
+              <QtyStepper value={qty} onChange={onQty} label={`Quantity of ${displayName}`} />
+              <span className="font-mono text-[10.5px] uppercase tracking-[0.1em] text-mono-muted">QTY</span>
+            </div>
+          )}
+          <button onClick={onOpen} className="mt-[6px] text-[12.5px] text-mono-muted underline underline-offset-2">
+            {open ? "Hide why" : "Why?"}
+          </button>
+          {open && (
+            <div className="mt-2.5 flex flex-col gap-2 border-l-2 border-[#eadfcb] pl-3">
+              <p className="m-0 text-[13.5px] leading-[1.55] text-ink-muted">{hold.detail}</p>
+              {guidance.personalNotes.map((note, index) => (
+                <p key={index} className="m-0 text-[13.5px] leading-[1.5] text-ink">
+                  <span className="font-bold text-primary">For you:</span> {note}
+                </p>
+              ))}
+              {hold.price?.note && <p className="m-0 text-[12.5px] text-ink-muted">💰 {hold.price.note}</p>}
+              <p className="m-0 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#a79e8b]">
+                Confidence {hold.confidence}
+                {hold.tags?.includes("community-pending")
+                  ? " · community pending"
+                  : hold.claimIds?.length
+                    ? ` · ${hold.claimIds.length} source${hold.claimIds.length > 1 ? "s" : ""} in The Hold`
+                    : ""}
+              </p>
+            </div>
+          )}
+        </div>
+        <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
+          <VerdictBadge verdict={guidance.verdict} contested={hold.contested} />
+          <CommunityStat stat={stat} />
+        </div>
       </div>
     </div>
   );

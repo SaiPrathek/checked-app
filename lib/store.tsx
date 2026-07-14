@@ -13,6 +13,7 @@ import { useUser } from "@clerk/nextjs";
 import type { BagId, Profile } from "./types";
 import { PACKING_ITEMS } from "./packing-items";
 import { recommendedQty } from "./guidance";
+import { migrateProfile } from "./profile";
 import { getMyProfile, saveProfile } from "./actions/profile";
 import {
   getMyList,
@@ -57,7 +58,15 @@ function loadLocal(): Persisted {
   if (typeof window === "undefined") return { profile: {}, list: [], qty: {}, bags: {} };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw) return { profile: {}, list: [], qty: {}, bags: {}, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        profile: migrateProfile(parsed.profile),
+        list: parsed.list ?? [],
+        qty: parsed.qty ?? {},
+        bags: parsed.bags ?? {},
+      };
+    }
   } catch {
     /* ignore */
   }

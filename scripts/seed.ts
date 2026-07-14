@@ -18,6 +18,7 @@ interface Src { id: string; url: string; title: string; quality: string; publish
 interface Item {
   item: string; category: string; verdict: string; confidence: string; contested: boolean;
   detail: string; support?: Record<string, number>; claimIds?: string[];
+  tags?: string[];
   context?: unknown; price?: { inr?: number|null; usd?: number|null; note?: string } | null; weightNote?: string | null;
 }
 interface Claim {
@@ -69,6 +70,7 @@ async function main() {
       context: (it.context ?? null) as unknown,
       support: (it.support ?? null) as unknown,
       claimIds: (it.claimIds ?? null) as unknown,
+      tags: (it.tags ?? null) as unknown,
     })),
   );
   console.log(`  ✓ inserted ${itemsJson.items.length} hold_items`);

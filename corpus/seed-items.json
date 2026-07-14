@@ -66,7 +66,8 @@
       "support": { "bring-from-india": 4, "buy-in-us": 2 },
       "claimIds": ["c001", "c012", "c016", "c023", "c029", "c039"],
       "context": {
-        "diet": { "veg-cooking-heavy": "Stronger case to bring/own one early since you'll cook daily.", "eats-out": "Lower priority; buy later if needed." },
+        "cooking": { "daily": "Stronger case to bring or own one early since you'll cook daily.", "rarely": "Lower priority; buy later if needed." },
+        "roommates": { "roommates": "Coordinate with roommates before anyone packs a duplicate." },
         "housing": { "dorm": "Often no kitchen access — skip initially.", "apartment": "Needed; decide bring-small vs buy Instant Pot." }
       },
       "price": { "usd": 70, "note": "Instant Pot $60-80 on US sale" },
@@ -78,7 +79,11 @@
       "verdict": "either", "confidence": "medium", "contested": true,
       "detail": "Lightweight, hard-to-find-cheaply items are worth bringing — a flat iron tava/griddle, a masala box, a tea strainer, a good knife. Bulky/heavy basics (pans, plates, glasses) are cheap in the US (Walmart/dollar stores) and not worth the weight; buy or ship on arrival. Skip anything electric from India (voltage).",
       "support": { "bring-from-india": 2, "buy-in-us": 1 }, "claimIds": ["c016", "c023", "c047"],
-      "context": { "housing": { "dorm": "Minimal need.", "apartment": "Buy the bulk of it locally." } },
+      "context": {
+        "housing": { "dorm": "Minimal need.", "apartment": "Buy the bulk of it locally." },
+        "roommates": { "roommates": "Coordinate shared tava, pans and iron before packing." },
+        "cooking": { "daily": "Prioritize the few tools you use every day.", "rarely": "Skip a starter kitchen kit for now." }
+      },
       "price": null, "weightNote": "bring only light, high-use items",
       "communityStats": null
     },
@@ -87,7 +92,10 @@
       "verdict": "bring-from-india", "confidence": "medium", "contested": true,
       "detail": "Bring dry, sealed spices and masalas (turmeric, garam masala, cumin, coriander, chilli powder, hing) — a strong majority view. They're cheaper in India and marked up ~4x at US Indian stores, especially in small towns. Declare them at customs; sealed, dry, commercially-packaged spices are generally admissible. Two sources counsel caution (IDP flags 'plant products'), so keep quantities reasonable and everything sealed.",
       "support": { "bring-from-india": 5, "skip": 1 }, "claimIds": ["c002", "c008", "c017", "c028", "c052"],
-      "context": {}, "price": { "note": "Indian groceries ~4x India price in US stores" }, "weightNote": "light and high-value; declare at CBP",
+      "context": {
+        "dietPractice": { "jain": "Choose onion-garlic-free blends and check every ingredient label.", "halal": "Keep blends vegetarian or verify any meat flavoring is halal." },
+        "cuisine": { "south": "Prioritize sambar, rasam and podi blends.", "north": "Prioritize garam masala and rajma/chole blends.", "west": "Prioritize goda masala and dhokla mixes.", "east": "Prioritize panch phoron and mustard-based staples." }
+      }, "price": { "note": "Indian groceries ~4x India price in US stores" }, "weightNote": "light and high-value; declare at CBP",
       "communityStats": null
     },
     {
@@ -105,7 +113,7 @@
       "verdict": "bring-from-india", "confidence": "medium", "contested": false,
       "detail": "Maggi, ready-to-eat poha/khichdi/upma, MTR-type packets — bring a couple weeks' worth. Sold only at US Indian stores and beloved in the first homesick months. Non-perishable and light.",
       "support": { "bring-from-india": 2 }, "claimIds": ["c014", "c056"],
-      "context": {}, "price": null, "weightNote": "light",
+      "context": { "dietPractice": { "jain": "Check for onion and garlic in ready-to-eat packets.", "halal": "Check flavor packets for non-halal meat ingredients." } }, "price": null, "weightNote": "light",
       "communityStats": null
     },
     {
@@ -170,7 +178,7 @@
       "verdict": "bring-from-india", "confidence": "low", "contested": false,
       "detail": "Bring 1 formal outfit (suit/blazer or a saree/sherwani for cultural events) — tailoring is far cheaper in India, and ethnic wear has limited, costly options in the US. You'll want it for presentations, conferences, and Diwali/cultural nights.",
       "support": { "bring-from-india": 1 }, "claimIds": ["c032"],
-      "context": {}, "price": null, "weightNote": "1 outfit only",
+      "context": { "gender": { "female": "A saree or lehenga covers cultural events; pack one versatile set.", "male": "A kurta or sherwani covers cultural events; pack one versatile set.", "nonbinary": "Choose the one formal and one cultural outfit you feel best in." } }, "price": null, "weightNote": "1 outfit only",
       "communityStats": null
     },
     {
@@ -180,6 +188,85 @@
       "support": { "buy-in-us": 4 }, "claimIds": ["c031", "c053", "c059"],
       "context": {}, "price": null, "weightNote": "starter kit only; bulk toiletries waste weight",
       "communityStats": null
+    },
+    {
+      "item": "filter coffee kit", "category": "kitchen",
+      "verdict": "bring-from-india", "confidence": "low", "contested": false,
+      "detail": "Bring a compact South Indian filter, a dabara set if you use one, and a sealed starter pack of your preferred coffee. Familiar blends and traditional gear are available in the US but often carry a steep import markup.",
+      "support": {}, "claimIds": [], "tags": ["community-pending"],
+      "context": { "beverage": { "filter-coffee": "This is part of your daily routine, not a novelty.", "both": "Pack the compact filter and buy refills locally." } },
+      "price": { "inr": 300, "usd": 40, "note": "Indicative starter-kit comparison; awaiting community validation" }, "weightNote": "compact, high comfort-to-weight value", "communityStats": null
+    },
+    {
+      "item": "chai kit", "category": "food",
+      "verdict": "bring-from-india", "confidence": "low", "contested": false,
+      "detail": "Bring a sealed starter supply of your preferred loose tea and chai masala. Both are sold in the US, but a familiar blend makes the first weeks easier and weighs little.",
+      "support": {}, "claimIds": [], "tags": ["community-pending"],
+      "context": { "beverage": { "chai": "A small daily-use kit earns its luggage space.", "both": "Keep both beverage kits compact." } },
+      "price": null, "weightNote": "light; keep commercially sealed", "communityStats": null
+    },
+    {
+      "item": "south indian spice kit", "category": "food",
+      "verdict": "bring-from-india", "confidence": "low", "contested": false,
+      "detail": "Pack sealed sambar and rasam powders plus the podis you actually use. Regional blends are costlier and less consistent in US stores than basic whole spices.",
+      "support": {}, "claimIds": [], "tags": ["community-pending"], "context": { "dietPractice": { "jain": "Choose onion-garlic-free blends." } },
+      "price": null, "weightNote": "keep dry, sealed and declared", "communityStats": null
+    },
+    {
+      "item": "north indian spice kit", "category": "food",
+      "verdict": "bring-from-india", "confidence": "low", "contested": false,
+      "detail": "Pack sealed garam masala and the rajma/chole blends you trust. Bring a focused set rather than duplicating spices that are easy to buy anywhere.",
+      "support": {}, "claimIds": [], "tags": ["community-pending"], "context": { "dietPractice": { "jain": "Choose onion-garlic-free blends." } },
+      "price": null, "weightNote": "keep dry, sealed and declared", "communityStats": null
+    },
+    {
+      "item": "west indian spice kit", "category": "food",
+      "verdict": "bring-from-india", "confidence": "low", "contested": false,
+      "detail": "Pack sealed goda masala, dhokla mixes and the regional blends you use most. These are harder to replace outside large Indian grocery hubs.",
+      "support": {}, "claimIds": [], "tags": ["community-pending"], "context": { "dietPractice": { "jain": "Choose onion-garlic-free mixes." } },
+      "price": null, "weightNote": "keep dry, sealed and declared", "communityStats": null
+    },
+    {
+      "item": "east indian spice kit", "category": "food",
+      "verdict": "bring-from-india", "confidence": "low", "contested": false,
+      "detail": "Pack sealed panch phoron, mustard preparations and the regional dry blends you rely on. Availability varies sharply outside major US cities.",
+      "support": {}, "claimIds": [], "tags": ["community-pending"], "context": {},
+      "price": null, "weightNote": "keep dry, sealed and declared", "communityStats": null
+    },
+    {
+      "item": "jain masala set", "category": "food",
+      "verdict": "bring-from-india", "confidence": "low", "contested": false,
+      "detail": "Bring clearly labeled onion-garlic-free masalas and mixes you already trust. Suitable packaged options can be inconsistent or expensive in US Indian stores.",
+      "support": {}, "claimIds": [], "tags": ["community-pending"], "context": {},
+      "price": null, "weightNote": "dry and sealed only", "communityStats": null
+    },
+    {
+      "item": "pickles and podis", "category": "food",
+      "verdict": "bring-from-india", "confidence": "low", "contested": false,
+      "detail": "Bring two small, commercially sealed dry pickles or podis you will use often. Avoid wet, leaking or homemade jars; declare all food at customs.",
+      "support": {}, "claimIds": [], "tags": ["community-pending"], "context": { "cooking": { "daily": "Two favorites add variety without much weight.", "weekly": "One or two small packs are enough." } },
+      "price": null, "weightNote": "avoid glass and wet products", "communityStats": null
+    },
+    {
+      "item": "grooming kit", "category": "toiletries",
+      "verdict": "bring-from-india", "confidence": "low", "contested": false,
+      "detail": "Bring your existing dual-voltage trimmer and compact grooming tools. Familiar gear is useful immediately, while US haircuts commonly cost around $30–60.",
+      "support": {}, "claimIds": [], "tags": ["community-pending"], "context": {},
+      "price": { "usd": 45, "note": "Indicative US haircut cost; awaiting community validation" }, "weightNote": "confirm 110–240V input", "communityStats": null
+    },
+    {
+      "item": "cosmetics and skincare starter", "category": "toiletries",
+      "verdict": "bring-from-india", "confidence": "low", "contested": false,
+      "detail": "Bring a two-to-three month starter set of products your skin already tolerates, then replace locally. Avoid bulk backups; many global brands are cheaper in the US.",
+      "support": {}, "claimIds": [], "tags": ["community-pending"], "context": {},
+      "price": null, "weightNote": "starter quantities only", "communityStats": null
+    },
+    {
+      "item": "sanitary supply", "category": "toiletries",
+      "verdict": "bring-from-india", "confidence": "low", "contested": false,
+      "detail": "Bring a compact two-to-three month starter supply of the products you know. US alternatives are widely available, but familiar sizing and comfort help during the transition.",
+      "support": {}, "claimIds": [], "tags": ["community-pending"], "context": {},
+      "price": null, "weightNote": "compressible; starter supply only", "communityStats": null
     },
     {
       "item": "stationery and textbooks", "category": "toiletries",

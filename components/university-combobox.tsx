@@ -8,12 +8,13 @@ const MAX_RESULTS = 30;
 
 interface UniversityComboboxProps {
   onSelect: (university: string) => void;
+  initialValue?: string;
 }
 
-export function UniversityCombobox({ onSelect }: UniversityComboboxProps) {
+export function UniversityCombobox({ onSelect, initialValue = "" }: UniversityComboboxProps) {
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialValue);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [customMode, setCustomMode] = useState(false);
