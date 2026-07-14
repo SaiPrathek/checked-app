@@ -52,6 +52,7 @@ export default function Manifest() {
   } = useApp();
   const { isSignedIn } = useUser();
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<Category>("documents");
   const [stats, setStats] = useState<Map<string, Stat>>(new Map());
 
   const visibleItems = useMemo(
@@ -74,6 +75,23 @@ export default function Manifest() {
     () => visibleItems.filter((item) => recommendedQty(item, profile) === 0 && !list.includes(item.id)),
     [list, profile, visibleItems],
   );
+
+  const availableCategories = useMemo(
+    () => CATEGORY_ORDER.filter((category) =>
+      visibleItems.some((item) => item.category === category),
+    ),
+    [visibleItems],
+  );
+  const activeItems = grouped.get(activeCategory) ?? [];
+  const activeNotNeeded = notNeeded.filter(
+    (item) => item.category === activeCategory,
+  );
+
+  useEffect(() => {
+    if (!availableCategories.includes(activeCategory) && availableCategories[0]) {
+      setActiveCategory(availableCategories[0]);
+    }
+  }, [activeCategory, availableCategories]);
 
   // Community stats are public — fetch for every visitor.
   useEffect(() => {
@@ -191,42 +209,85 @@ export default function Manifest() {
         </Link>
       )}
 
-      {CATEGORY_ORDER.map((cat) => {
-        const items = grouped.get(cat);
-        if (!items?.length) return null;
-        return (
-          <section key={cat} className="flex flex-col gap-2">
-            <h2 className="mt-2 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-mono-muted">
-              {CATEGORY_LABEL[cat]}
-            </h2>
-            <div className="overflow-hidden rounded-[14px] border border-card-border bg-card shadow-[0_12px_26px_-24px_rgba(20,26,38,0.5)]">
-              {items.map((it, idx) => (
-                <ManifestRow
-                  key={it.id}
-                  item={it}
-                  profile={profile}
-                  first={idx === 0}
-                  listed={isListed(it.id)}
-                  qty={qtyFor(it.id)}
-                  open={expanded === it.id}
-                  stat={stats.get(it.holdKey)}
-                  onToggle={() => toggleListItem(it.id)}
-                  onQty={(qty) => setQtyForItem(it.id, qty)}
-                  onOpen={() => setExpanded(expanded === it.id ? null : it.id)}
-                />
-              ))}
-            </div>
-          </section>
-        );
-      })}
+      <section className="overflow-hidden rounded-[14px] border border-card-border bg-card shadow-[0_12px_26px_-24px_rgba(20,26,38,0.5)]">
+        <div
+          role="tablist"
+          aria-label="Manifest categories"
+          className="flex overflow-x-auto border-b border-card-border bg-[#f6f1e6] p-1.5"
+        >
+          {availableCategories.map((category) => {
+            const selected = category === activeCategory;
+            const count = visibleItems.filter(
+              (item) => item.category === category,
+            ).length;
+            return (
+              <button
+                key={category}
+                type="button"
+                role="tab"
+                id={`manifest-tab-${category}`}
+                aria-selected={selected}
+                aria-controls={`manifest-panel-${category}`}
+                onClick={() => {
+                  setActiveCategory(category);
+                  setExpanded(null);
+                }}
+                className={
+                  selected
+                    ? "shrink-0 rounded-[9px] bg-nav px-3.5 py-2.5 text-left text-nav-text shadow-sm"
+                    : "shrink-0 rounded-[9px] px-3.5 py-2.5 text-left text-ink-muted transition-colors hover:bg-card hover:text-ink"
+                }
+              >
+                <span className="block whitespace-nowrap text-[12.5px] font-semibold">
+                  {CATEGORY_LABEL[category]}
+                </span>
+                <span className={selected
+                  ? "mt-0.5 block font-mono text-[9.5px] tracking-[0.1em] text-nav-muted"
+                  : "mt-0.5 block font-mono text-[9.5px] tracking-[0.1em] text-mono-muted"}
+                >
+                  {count} ITEM{count === 1 ? "" : "S"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
-      {notNeeded.length > 0 && (
-        <details className="overflow-hidden rounded-[14px] border border-card-border bg-[#f6f1e6]">
-          <summary className="cursor-pointer px-4 py-3.5 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-mono-muted">
-            Not needed for you · {notNeeded.length} item{notNeeded.length === 1 ? "" : "s"}
-          </summary>
-          <div className="border-t border-card-border bg-card opacity-70">
-            {notNeeded.map((it, idx) => (
+        <div
+          role="tabpanel"
+          id={`manifest-panel-${activeCategory}`}
+          aria-labelledby={`manifest-tab-${activeCategory}`}
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-divider px-4 py-3">
+            <h2 className="m-0 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-mono-muted">
+              {CATEGORY_LABEL[activeCategory]}
+            </h2>
+            <span className="text-[12px] text-ink-muted">
+              {activeItems.length} recommended
+            </span>
+          </div>
+          {activeItems.map((it, idx) => (
+            <ManifestRow
+              key={it.id}
+              item={it}
+              profile={profile}
+              first={idx === 0}
+              listed={isListed(it.id)}
+              qty={qtyFor(it.id)}
+              open={expanded === it.id}
+              stat={stats.get(it.holdKey)}
+              onToggle={() => toggleListItem(it.id)}
+              onQty={(qty) => setQtyForItem(it.id, qty)}
+              onOpen={() => setExpanded(expanded === it.id ? null : it.id)}
+            />
+          ))}
+
+          {activeNotNeeded.length > 0 && (
+            <details className="border-t border-card-border bg-[#f6f1e6]">
+              <summary className="cursor-pointer px-4 py-3.5 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-mono-muted">
+                Not needed for you · {activeNotNeeded.length} item{activeNotNeeded.length === 1 ? "" : "s"}
+              </summary>
+              <div className="border-t border-card-border bg-card opacity-70">
+                {activeNotNeeded.map((it, idx) => (
               <ManifestRow
                 key={it.id}
                 item={it}
@@ -240,10 +301,12 @@ export default function Manifest() {
                 onQty={(qty) => setQtyForItem(it.id, qty)}
                 onOpen={() => setExpanded(expanded === it.id ? null : it.id)}
               />
-            ))}
-          </div>
-        </details>
-      )}
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      </section>
 
       <div className="sticky bottom-4 mx-auto flex w-full max-w-[440px] items-center justify-between gap-3 rounded-full border border-[#22344f] bg-nav py-2.5 pl-5 pr-3 shadow-[0_18px_34px_-20px_rgba(6,12,24,0.7)]">
         <span className="text-[14px] text-[#e7edf7]">
