@@ -2,9 +2,11 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import universities from "@/data/us-universities.json";
+import universityGeo from "@/data/university-geo.json";
 import { cn } from "@/lib/utils";
 
 const MAX_RESULTS = 30;
+const UNIVERSITY_GEO = universityGeo as Record<string, { city: string; state: string }>;
 
 interface UniversityComboboxProps {
   onSelect: (university: string) => void;
@@ -24,7 +26,13 @@ export function UniversityCombobox({ onSelect, initialValue = "" }: UniversityCo
     if (!needle) return universities;
 
     return universities
-      .filter((name) => name.toLocaleLowerCase().includes(needle))
+      .filter((name) => {
+        const location = UNIVERSITY_GEO[name];
+        return (
+          name.toLocaleLowerCase().includes(needle) ||
+          `${location.city} ${location.state}`.toLocaleLowerCase().includes(needle)
+        );
+      })
       .sort((a, b) => {
         const aStarts = a.toLocaleLowerCase().startsWith(needle);
         const bStarts = b.toLocaleLowerCase().startsWith(needle);
@@ -126,7 +134,7 @@ export function UniversityCombobox({ onSelect, initialValue = "" }: UniversityCo
               setOpen(false);
             }
           }}
-          placeholder="Search 2,337 U.S. universities"
+          placeholder={`Search ${universities.length.toLocaleString()} U.S. universities`}
           className="h-11 w-full rounded-[9px] border border-field-border bg-field px-3.5 pr-10 text-[14.5px] text-ink outline-none placeholder:text-ink-muted focus-visible:border-primary"
         />
         <span
@@ -147,8 +155,10 @@ export function UniversityCombobox({ onSelect, initialValue = "" }: UniversityCo
             role="listbox"
             className="m-0 max-h-64 list-none overflow-y-auto p-1.5"
           >
-            {visibleMatches.map((name, index) => (
-              <li
+            {visibleMatches.map((name, index) => {
+              const location = UNIVERSITY_GEO[name];
+              return (
+                <li
                 id={`${listId}-option-${index}`}
                 role="option"
                 aria-selected={activeIndex === index}
@@ -160,10 +170,14 @@ export function UniversityCombobox({ onSelect, initialValue = "" }: UniversityCo
                   "cursor-pointer rounded-[7px] px-3 py-2 text-[14px] leading-snug text-ink",
                   activeIndex === index && "bg-divider",
                 )}
-              >
-                {name}
-              </li>
-            ))}
+                >
+                  <span className="block">{name}</span>
+                  <span className="mt-0.5 block font-mono text-[10px] tracking-[0.08em] text-mono-muted">
+                    {location.city}, {location.state}
+                  </span>
+                </li>
+              );
+            })}
             {visibleMatches.length === 0 && (
               <li className="px-3 py-3 text-[14px] text-ink-muted">
                 No matching university found.

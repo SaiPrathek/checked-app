@@ -9,7 +9,6 @@ import {
   REGION_LABELS,
   climateForRegion,
   deriveUniversityDestination,
-  destinationInsight,
 } from "@/lib/climate";
 import {
   PROFILE_LABELS,
@@ -18,7 +17,6 @@ import {
 } from "@/lib/profile";
 import { useApp } from "@/lib/store";
 import type { Profile } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 type StepKey =
   | "university"
@@ -165,13 +163,6 @@ const STEPS: Step[] = [
   },
 ];
 
-interface Turn {
-  key: StepKey;
-  bot: string;
-  answer: string;
-  insight?: string | null;
-}
-
 type Mode = "loading" | "interview" | "review" | "edit";
 
 function isAnswered(profile: Profile, key: StepKey): boolean {
@@ -186,38 +177,6 @@ function firstMissingStep(profile: Profile): StepKey {
   return visibleSteps(profile).find((step) => !isAnswered(profile, step.key))?.key ?? "university";
 }
 
-function answerLabel(step: Step, value: string): string {
-  return step.options?.find((option) => option.value === value)?.label ?? value;
-}
-
-function insightFor(key: StepKey, profile: Profile): string | null {
-  if (key === "university" || key === "region") {
-    const exact = destinationInsight(profile);
-    if (exact) return exact;
-    if (key === "region" && profile.region && profile.climate) {
-      return `✈ ${REGION_LABELS[profile.region]} selected. I'm using a ${CLIMATE_LABELS[profile.climate]} packing baseline until we know the exact city.`;
-    }
-    return null;
-  }
-  if (key === "intake" && profile.intake === "spring" && profile.climate === "cold") {
-    return "You land into January. Your day-one winter jacket moves to the cabin bag.";
-  }
-  if (key === "roommates" && profile.roommates === "roommates") {
-    return "Pressure cooker, tava and iron — coordinate instead of packing duplicates. I've flagged shareable items.";
-  }
-  if (key === "cuisine" && profile.cuisine) {
-    const cuisineCopy = {
-      south: "Sambar & rasam powders, podis and a filter-coffee kit",
-      north: "Garam masala, rajma and chole essentials",
-      west: "Goda masala, dhokla mixes and familiar pickles",
-      east: "Panch phoron, mustard and hard-to-find regional staples",
-    }[profile.cuisine];
-    const modifier = profile.dietPractice === "jain" ? " — all onion-garlic-free" : "";
-    return `${cuisineCopy}${modifier}. Familiar ₹300 staples can cost $40+ imported in the US.`;
-  }
-  return null;
-}
-
 export default function CheckIn() {
   const router = useRouter();
   const { isLoaded: authLoaded, isSignedIn, user } = useUser();
@@ -225,7 +184,6 @@ export default function CheckIn() {
   const [draft, setDraft] = useState<Profile>({});
   const [mode, setMode] = useState<Mode>("loading");
   const [stepKey, setStepKey] = useState<StepKey>("university");
-  const [history, setHistory] = useState<Turn[]>([]);
   const [resetPending, setResetPending] = useState(false);
 
   useEffect(() => {
@@ -299,16 +257,6 @@ export default function CheckIn() {
       return;
     }
 
-    setHistory((turns) => [
-      ...turns,
-      {
-        key: current.key,
-        bot: current.prompt,
-        answer: answerLabel(current, value),
-        insight: insightFor(current.key, next),
-      },
-    ]);
-
     const candidates = visibleSteps(next);
     const currentIndex = STEPS.findIndex((candidate) => candidate.key === current.key);
     const nextStep = candidates.find(
@@ -337,14 +285,6 @@ export default function CheckIn() {
     const previous = activeSteps[activeIndex - 1];
     if (!previous) return;
     setStepKey(previous.key);
-    if (mode === "interview") {
-      const previousIndex = STEPS.findIndex((candidate) => candidate.key === previous.key);
-      setHistory((turns) =>
-        turns.filter(
-          (turn) => STEPS.findIndex((candidate) => candidate.key === turn.key) < previousIndex,
-        ),
-      );
-    }
   }
 
   function goNext() {
@@ -366,7 +306,6 @@ export default function CheckIn() {
     };
     setDraft(fresh);
     setProfile(fresh);
-    setHistory([]);
     setResetPending(false);
     setStepKey("university");
     setMode("interview");
@@ -446,15 +385,6 @@ export default function CheckIn() {
           </div>
 
           <div className="flex flex-col gap-4 rounded-2xl border border-card-border bg-card p-[22px] shadow-[0_18px_34px_-28px_rgba(20,26,38,0.5)]">
-            {mode === "interview" &&
-              history.map((turn, index) => (
-                <div key={`${turn.key}-${index}`} className="flex flex-col gap-2">
-                  <Bubble side="bot">{turn.bot}</Bubble>
-                  <Bubble side="user">{turn.answer}</Bubble>
-                  {turn.insight && <InsightCard>{turn.insight}</InsightCard>}
-                </div>
-              ))}
-
             {mode === "edit" && (
               <div className="font-mono text-[10px] tracking-[0.15em] text-primary">
                 EDITING ONE ANSWER · YOU'LL RETURN TO REVIEW
@@ -462,7 +392,14 @@ export default function CheckIn() {
             )}
 
             <div className="flex flex-col gap-3">
-              <Bubble side="bot">{step.prompt}</Bubble>
+              <div>
+                <div className="mb-1 font-mono text-[10px] font-bold tracking-[0.14em] text-mono-muted">
+                  STEP {activeIndex + 1} OF {activeSteps.length}
+                </div>
+                <h2 className="m-0 font-display text-[22px] font-bold tracking-[-0.01em] text-ink">
+                  {step.prompt}
+                </h2>
+              </div>
               {step.type === "university" ? (
                 <UniversityCombobox
                   key={`${mode}-${draft.university ?? "new"}`}
@@ -638,33 +575,5 @@ function ReviewChip({
         {value || "Add answer"} <span className="font-normal opacity-50">↗</span>
       </span>
     </button>
-  );
-}
-
-function InsightCard({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="ml-0 rounded-[12px] border border-[#f0d49a] bg-[#fff8e8] px-4 py-3 text-[13.5px] leading-[1.5] text-[#5d430f] sm:ml-6">
-      <div className="mb-1 font-mono text-[9.5px] font-bold tracking-[0.15em] text-[#9a6500]">
-        MANIFEST UPDATED
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function Bubble({ side, children }: { side: "bot" | "user"; children: React.ReactNode }) {
-  return (
-    <div className={cn("flex", side === "user" ? "justify-end" : "justify-start")}>
-      <div
-        className={cn(
-          "max-w-[88%] px-3.5 py-2.5 text-[14.5px] leading-[1.45]",
-          side === "user"
-            ? "rounded-[16px_16px_4px_16px] bg-primary text-white"
-            : "rounded-[16px_16px_16px_4px] bg-[#f1ece0] text-ink",
-        )}
-      >
-        {children}
-      </div>
-    </div>
   );
 }
