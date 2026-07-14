@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { UniversityCombobox } from "@/components/university-combobox";
 import { useApp } from "@/lib/store";
 import type { Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -9,6 +10,7 @@ import { cn } from "@/lib/utils";
 type Step =
   | { key: "name"; type: "text"; prompt: string; placeholder: string }
   | { key: "city"; type: "text"; prompt: string; placeholder: string }
+  | { key: "university"; type: "university"; prompt: string }
   | {
       key: keyof Profile;
       type: "choice";
@@ -18,7 +20,8 @@ type Step =
 
 const STEPS: Step[] = [
   { key: "name", type: "text", prompt: "Hi! I'm your Check-In agent. First — what should I call you?", placeholder: "Your name" },
-  { key: "city", type: "text", prompt: "Nice to meet you. Which university or city are you heading to?", placeholder: "e.g. UIUC, Champaign IL" },
+  { key: "university", type: "university", prompt: "Nice to meet you. Which university are you heading to?" },
+  { key: "city", type: "text", prompt: "And which city will you call home?", placeholder: "e.g. Champaign, IL" },
   {
     key: "intake",
     type: "choice",
@@ -111,7 +114,11 @@ export default function CheckIn() {
         {!done && step && (
           <div className="flex flex-col gap-3">
             <Bubble side="bot">{step.prompt}</Bubble>
-            {step.type === "text" ? (
+            {step.type === "university" ? (
+              <UniversityCombobox
+                onSelect={(university) => commit(university, university)}
+              />
+            ) : step.type === "text" ? (
               <form
                 className="flex gap-2"
                 onSubmit={(e) => {

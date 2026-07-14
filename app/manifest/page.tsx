@@ -64,6 +64,7 @@ export default function Manifest() {
             {profile.completed ? (
               <>
                 Tailored for {profile.name || "you"}
+                {profile.university ? ` · ${profile.university}` : ""}
                 {profile.city ? ` · ${profile.city}` : ""}
                 {profile.intake ? ` · ${profile.intake} intake` : ""}
                 {profile.housing ? ` · ${profile.housing}` : ""}.
