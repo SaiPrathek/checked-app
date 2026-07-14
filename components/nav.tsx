@@ -11,6 +11,7 @@ const LINKS = [
   { href: "/manifest", label: "The Manifest" },
   { href: "/weigh-in", label: "Weigh-In" },
   { href: "/the-tower", label: "The Tower" },
+  { href: "/debrief", label: "Debrief" },
 ];
 
 const TICKER = [

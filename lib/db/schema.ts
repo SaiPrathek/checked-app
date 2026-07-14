@@ -5,7 +5,6 @@ import {
   timestamp,
   jsonb,
   numeric,
-  serial,
   primaryKey,
 } from "drizzle-orm/pg-core";
 
@@ -109,13 +108,23 @@ export const claims = pgTable("claims", {
  * verdict: worth-it | useless | should-buy-there | wish-brought-more
  * Schema ready; UI comes in Phase 3.
  */
-export const debriefResponses = pgTable("debrief_responses", {
-  id: serial("id").primaryKey(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  item: text("item").notNull(),
-  verdict: text("verdict").notNull(),
-  note: text("note"),
-  submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
-});
+/**
+ * debrief_responses — one row per (user, item). Users can revise, so use
+ * upsert against the composite pk. verdict ∈ {"worth-it" | "useless" |
+ * "should-buy-there" | "wish-brought-more"}.
+ */
+export const debriefResponses = pgTable(
+  "debrief_responses",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    item: text("item").notNull(),
+    verdict: text("verdict").notNull(),
+    note: text("note"),
+    submittedAt: timestamp("submitted_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.userId, t.item] }) }),
+);

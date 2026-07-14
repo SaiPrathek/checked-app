@@ -6,6 +6,7 @@ const FLIGHTS = [
   { href: "/manifest", flight: "CK 02", name: "The Manifest", dest: "Your packing list", gate: "B4", status: "ON TIME", fg: "#7BE0A8", bg: "rgba(20,122,72,0.2)" },
   { href: "/weigh-in", flight: "CK 03", name: "Weigh-In", dest: "Bag weight simulator", gate: "C2", status: "ON TIME", fg: "#7BE0A8", bg: "rgba(20,122,72,0.2)" },
   { href: "/the-tower", flight: "CK 04", name: "The Tower", dest: "Ask anything · ATC", gate: "D7", status: "STANDBY", fg: "#A9BAD4", bg: "rgba(94,119,160,0.2)" },
+  { href: "/debrief", flight: "CK 05", name: "Debrief", dest: "Feedback · post-flight", gate: "E5", status: "ARRIVED", fg: "#FFD98A", bg: "rgba(245,166,35,0.16)" },
 ];
 
 const FEATURES = [
@@ -13,6 +14,7 @@ const FEATURES = [
   { href: "/manifest", name: "The Manifest", flight: "CK 02", gate: "B4", blurb: "Your packing list with a clear verdict on each item: bring, buy, either, or skip — with the reasoning." },
   { href: "/weigh-in", name: "Weigh-In", flight: "CK 03", gate: "C2", blurb: "Assign items to your bags and watch live weight meters. Never be 4 kg over at the airport counter again." },
   { href: "/the-tower", name: "The Tower", flight: "CK 04", gate: "D7", blurb: "Ask anything — customs, winter gear, kitchen kit — grounded in The Hold's community data." },
+  { href: "/debrief", name: "Debrief", flight: "CK 05", gate: "E5", blurb: "Landed already? Tell us what was worth packing. Every rating strengthens the community-backed verdicts in The Hold." },
 ];
 
 const BARS = [2, 1, 3, 1, 2, 1, 3, 2, 1];

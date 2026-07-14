@@ -1,13 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import { useApp } from "@/lib/store";
 import { PACKING_ITEMS } from "@/lib/packing-items";
 import { getHoldItem } from "@/lib/hold";
 import { resolveGuidance } from "@/lib/guidance";
 import type { Category, PackingItem } from "@/lib/types";
 import { VerdictBadge } from "@/components/ui/verdict-badge";
+import { CommunityStat } from "@/components/ui/community-stat";
+import { getCommunityStats } from "@/lib/actions/debrief";
+import type { Stat } from "@/lib/debrief";
 
 const CATEGORY_ORDER: Category[] = [
   "documents",
@@ -35,7 +39,9 @@ const CATEGORY_LABEL: Record<Category, string> = {
 
 export default function Manifest() {
   const { profile, list, toggleListItem, isListed, hydrated } = useApp();
+  const { isSignedIn } = useUser();
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [stats, setStats] = useState<Map<string, Stat>>(new Map());
 
   const grouped = useMemo(() => {
     const map = new Map<Category, PackingItem[]>();
@@ -45,6 +51,13 @@ export default function Manifest() {
       map.set(it.category, arr);
     }
     return map;
+  }, []);
+
+  // Community stats are public — fetch for every visitor.
+  useEffect(() => {
+    getCommunityStats()
+      .then((rows) => setStats(new Map(rows.map((r) => [r.item, r]))))
+      .catch((e) => console.error("getCommunityStats", e));
   }, []);
 
   if (!hydrated)
@@ -89,6 +102,25 @@ export default function Manifest() {
           </div>
         </div>
       </div>
+
+      {isSignedIn && list.length > 0 && (
+        <Link
+          href="/debrief"
+          className="flex items-center justify-between gap-3 rounded-xl border border-card-border bg-[#f6f1e6] px-4 py-3 text-[13.5px] transition-colors hover:bg-[#efe7d3]"
+        >
+          <span className="flex items-center gap-2 text-ink-muted">
+            <span
+              className="h-[7px] w-[7px] rounded-full bg-accent"
+              style={{ animation: "ck-blink 1.4s steps(1) infinite" }}
+            />
+            <span className="font-mono text-[10.5px] tracking-[0.14em] text-accent">
+              POST-FLIGHT
+            </span>
+            <span>Already arrived? Debrief what worked — it strengthens The Hold.</span>
+          </span>
+          <span className="font-semibold text-primary">Debrief →</span>
+        </Link>
+      )}
 
       {CATEGORY_ORDER.map((cat) => {
         const items = grouped.get(cat);
@@ -162,10 +194,13 @@ export default function Manifest() {
                           </div>
                         )}
                       </div>
-                      <VerdictBadge
-                        verdict={guidance.verdict}
-                        contested={hold.contested}
-                      />
+                      <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
+                        <VerdictBadge
+                          verdict={guidance.verdict}
+                          contested={hold.contested}
+                        />
+                        <CommunityStat stat={stats.get(it.holdKey)} />
+                      </div>
                     </div>
                   </div>
                 );
