@@ -226,6 +226,7 @@ export default function CheckIn() {
   const [mode, setMode] = useState<Mode>("loading");
   const [stepKey, setStepKey] = useState<StepKey>("university");
   const [history, setHistory] = useState<Turn[]>([]);
+  const [resetPending, setResetPending] = useState(false);
 
   useEffect(() => {
     if (
@@ -357,6 +358,21 @@ export default function CheckIn() {
     if (typeof existingValue === "string") commit(existingValue);
   }
 
+  function resetProgress() {
+    const accountName = user?.fullName?.trim() || user?.firstName?.trim();
+    const fresh: Profile = {
+      name: accountName || "Traveler",
+      completed: false,
+    };
+    setDraft(fresh);
+    setProfile(fresh);
+    setHistory([]);
+    setResetPending(false);
+    setStepKey("university");
+    setMode("interview");
+    router.replace("/check-in");
+  }
+
   if (
     !hydrated ||
     !authLoaded ||
@@ -368,16 +384,48 @@ export default function CheckIn() {
 
   return (
     <div className="mx-auto flex max-w-[760px] flex-col gap-5">
-      <header>
-        <div className="mb-2 font-mono text-[11px] tracking-[0.2em] text-mono-muted">
-          GATE A1 · CK 01
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="mb-2 font-mono text-[11px] tracking-[0.2em] text-mono-muted">
+            GATE A1 · CK 01
+          </div>
+          <h1 className="m-0 font-display text-[34px] font-bold tracking-[-0.02em]">
+            Check-In
+          </h1>
+          <p className="mt-1.5 text-[15px] text-ink-muted">
+            Under 90 seconds. Every answer makes your Manifest smarter.
+          </p>
         </div>
-        <h1 className="m-0 font-display text-[34px] font-bold tracking-[-0.02em]">
-          Check-In
-        </h1>
-        <p className="mt-1.5 text-[15px] text-ink-muted">
-          Under 90 seconds. Every answer makes your Manifest smarter.
-        </p>
+        {STEPS.some((candidate) => isAnswered(draft, candidate.key)) &&
+          (resetPending ? (
+            <div className="flex items-center gap-2 rounded-[9px] border border-[#e3b8aa] bg-[#fff5f1] p-1.5">
+              <span className="pl-1.5 text-[12px] font-medium text-[#8b3d2f]">
+                Start over?
+              </span>
+              <button
+                type="button"
+                onClick={() => setResetPending(false)}
+                className="rounded-[7px] px-2.5 py-1.5 text-[12px] font-semibold text-ink-muted hover:bg-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={resetProgress}
+                className="rounded-[7px] bg-[#9d4435] px-2.5 py-1.5 text-[12px] font-semibold text-white hover:bg-[#84392d]"
+              >
+                Yes, reset
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setResetPending(true)}
+              className="rounded-[9px] border border-field-border bg-field px-3.5 py-2 text-[12.5px] font-semibold text-ink-muted transition-colors hover:border-primary hover:text-primary"
+            >
+              ↻ Reset progress
+            </button>
+          ))}
       </header>
 
       {mode === "review" ? (
