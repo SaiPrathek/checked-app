@@ -158,6 +158,36 @@ export default function WeighIn() {
   const volumeOver = packedVolume > capacity;
   const caseW = Math.round(Math.min(320, Math.max(120, config.w * 3.4)));
   const caseH = Math.round(Math.min(320, Math.max(120, config.h * 3.6)));
+  const isBackpack = def.quickAccess === true;
+
+  // The packed-items grid — shared by the suitcase and backpack shells.
+  const packedGridChildren =
+    packedLines.length > 0 ? (
+      packedLines.map((line) => {
+        const size = Math.round(Math.min(Math.min(caseW, caseH) * 0.42, Math.max(26, Math.sqrt(line.volL) * 15)));
+        return (
+          <button
+            key={line.item.id}
+            type="button"
+            title={`${line.item.name}${line.units > 1 ? ` ×${line.units}` : ""} · ${line.kg.toFixed(1)} kg — tap to unpack`}
+            onClick={() => setUnits(line.item.id, currentBag, 0)}
+            className="relative grid place-items-center rounded-lg border-2 border-card-border bg-card animate-[ck-drop_.45s_cubic-bezier(.2,.8,.3,1.15)]"
+            style={{ width: size, height: size, transform: `rotate(${rotationFor(line.item.id)}deg)` }}
+          >
+            {line.units > 1 && (
+              <span className="absolute right-0.5 top-0.5 rounded-full bg-ink px-1 py-px font-mono text-[8px] font-bold text-nav-text">
+                ×{line.units}
+              </span>
+            )}
+            <CategoryIcon category={line.item.category} size={Math.round(size * 0.7)} />
+          </button>
+        );
+      })
+    ) : (
+      <div className="grid h-full w-full place-items-center text-center font-mono text-[10px] leading-[1.8] tracking-[0.12em] text-[#a79e8b]">
+        TAP TRAY ITEMS<br />TO PACK — OR ✈ AUTO-PACK
+      </div>
+    );
 
   const inactiveBags = BAG_CATALOG.filter((b) => !activeBags.includes(b.id));
 
@@ -406,47 +436,55 @@ export default function WeighIn() {
 
               <div className="flex min-h-[300px] items-end justify-center px-0 pb-0 pt-2.5">
                 <div className="flex max-w-full flex-col items-center">
-                  <div className="h-[18px] w-16 rounded-t-[10px] border-4 border-b-0 border-nav-deep" />
-                  <div className="h-10 max-w-full transition-[width] duration-300" style={{ width: caseW, perspective: 220 }}>
-                    <div className="h-full w-full origin-bottom rounded-[14px_14px_6px_6px] border-[3px] border-nav-deep bg-[#1b2c44] shadow-[inset_0_-8px_0_rgba(255,255,255,0.07)]" style={{ transform: "rotateX(58deg)" }} />
-                  </div>
-                  <div
-                    className={weightOver || volumeOver ? "relative max-w-full animate-[ck-shake_.5s_ease-in-out_infinite] rounded-2xl border-[3px] border-nav-deep bg-ink shadow-[0_22px_34px_-22px_rgba(6,12,24,0.65)] transition-[width,height] duration-300" : "relative max-w-full rounded-2xl border-[3px] border-nav-deep bg-ink shadow-[0_22px_34px_-22px_rgba(6,12,24,0.65)] transition-[width,height] duration-300"}
-                    style={{ width: caseW, height: caseH }}
-                  >
-                    <div className="absolute bottom-0 left-[14%] top-0 w-[9px] bg-accent opacity-90" />
-                    <div className="absolute bottom-0 right-[14%] top-0 w-[9px] bg-accent opacity-90" />
-                    <div className="absolute inset-[9px] flex flex-wrap-reverse content-start justify-center gap-[3px] overflow-hidden rounded-[10px] border-2 border-dashed border-[#d8cebb] bg-[#fbf6ea] p-[5px]">
-                      {packedLines.length > 0 ? packedLines.map((line) => {
-                        const size = Math.round(Math.min(Math.min(caseW, caseH) * 0.42, Math.max(26, Math.sqrt(line.volL) * 15)));
-                        return (
-                          <button
-                            key={line.item.id}
-                            type="button"
-                            title={`${line.item.name}${line.units > 1 ? ` ×${line.units}` : ""} · ${line.kg.toFixed(1)} kg — tap to unpack`}
-                            onClick={() => setUnits(line.item.id, currentBag, 0)}
-                            className="relative grid place-items-center rounded-lg border-2 border-card-border bg-card animate-[ck-drop_.45s_cubic-bezier(.2,.8,.3,1.15)]"
-                            style={{ width: size, height: size, transform: `rotate(${rotationFor(line.item.id)}deg)` }}
-                          >
-                            {line.units > 1 && (
-                              <span className="absolute right-0.5 top-0.5 rounded-full bg-ink px-1 py-px font-mono text-[8px] font-bold text-nav-text">
-                                ×{line.units}
-                              </span>
-                            )}
-                            <CategoryIcon category={line.item.category} size={Math.round(size * 0.7)} />
-                          </button>
-                        );
-                      }) : (
-                        <div className="grid h-full w-full place-items-center text-center font-mono text-[10px] leading-[1.8] tracking-[0.12em] text-[#a79e8b]">
-                          TAP TRAY ITEMS<br />TO PACK — OR ✈ AUTO-PACK
+                  {isBackpack ? (
+                    /* ── Backpack: the quick-access personal item ── */
+                    <div className="relative max-w-full" style={{ width: caseW }}>
+                      {/* shoulder straps arcing up over the top */}
+                      <div className="absolute left-[20%] top-[-14px] z-0 h-[34px] w-[17px] rounded-t-[14px] border-[3px] border-b-0 border-nav-deep bg-[#1b2c44]" />
+                      <div className="absolute right-[20%] top-[-14px] z-0 h-[34px] w-[17px] rounded-t-[14px] border-[3px] border-b-0 border-nav-deep bg-[#1b2c44]" />
+                      {/* haul handle */}
+                      <div className="relative z-10 mx-auto h-[15px] w-12 rounded-t-[9px] border-[3px] border-b-0 border-nav-deep" />
+                      {/* body */}
+                      <div
+                        className={(weightOver || volumeOver ? "animate-[ck-shake_.5s_ease-in-out_infinite] " : "") + "relative z-10 max-w-full rounded-[26px_26px_18px_18px] border-[3px] border-nav-deep bg-ink shadow-[0_22px_34px_-22px_rgba(6,12,24,0.65)] transition-[width,height] duration-300"}
+                        style={{ height: caseH }}
+                      >
+                        {/* side compression buckles */}
+                        <div className="absolute left-[-2px] top-[42%] h-2 w-3 rounded-sm bg-accent opacity-90" />
+                        <div className="absolute right-[-2px] top-[42%] h-2 w-3 rounded-sm bg-accent opacity-90" />
+                        {/* main compartment */}
+                        <div className="absolute inset-x-[11px] top-[12%] bottom-[33%] flex flex-wrap-reverse content-start justify-center gap-[3px] overflow-hidden rounded-[13px] border-2 border-dashed border-[#d8cebb] bg-[#fbf6ea] p-[5px]">
+                          {packedGridChildren}
                         </div>
-                      )}
+                        {/* front pocket */}
+                        <div className="absolute inset-x-[19%] bottom-[10px] top-[70%] rounded-[9px_9px_14px_14px] border-2 border-nav-deep bg-[#1b2c44]">
+                          <div className="absolute left-1/2 top-[6px] h-2.5 w-4 -translate-x-1/2 rounded-[3px] bg-accent opacity-90" />
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="mt-[-3px] flex max-w-full justify-between px-[22px] transition-[width] duration-300" style={{ width: caseW }}>
-                    <span className="h-4 w-4 rounded-full bg-nav-deep" />
-                    <span className="h-4 w-4 rounded-full bg-nav-deep" />
-                  </div>
+                  ) : (
+                    /* ── Hard-shell checked / cabin case ── */
+                    <>
+                      <div className="relative z-10 h-[18px] w-16 rounded-t-[10px] border-4 border-b-0 border-nav-deep" />
+                      <div className="-mt-[16px] h-10 max-w-full transition-[width] duration-300" style={{ width: caseW, perspective: 220 }}>
+                        <div className="h-full w-full origin-bottom rounded-[14px_14px_6px_6px] border-[3px] border-nav-deep bg-[#1b2c44] shadow-[inset_0_-8px_0_rgba(255,255,255,0.07)]" style={{ transform: "rotateX(58deg)" }} />
+                      </div>
+                      <div
+                        className={(weightOver || volumeOver ? "animate-[ck-shake_.5s_ease-in-out_infinite] " : "") + "relative max-w-full rounded-2xl border-[3px] border-nav-deep bg-ink shadow-[0_22px_34px_-22px_rgba(6,12,24,0.65)] transition-[width,height] duration-300"}
+                        style={{ width: caseW, height: caseH }}
+                      >
+                        <div className="absolute bottom-0 left-[14%] top-0 w-[9px] bg-accent opacity-90" />
+                        <div className="absolute bottom-0 right-[14%] top-0 w-[9px] bg-accent opacity-90" />
+                        <div className="absolute inset-[9px] flex flex-wrap-reverse content-start justify-center gap-[3px] overflow-hidden rounded-[10px] border-2 border-dashed border-[#d8cebb] bg-[#fbf6ea] p-[5px]">
+                          {packedGridChildren}
+                        </div>
+                      </div>
+                      <div className="mt-[-3px] flex max-w-full justify-between px-[22px] transition-[width] duration-300" style={{ width: caseW }}>
+                        <span className="h-4 w-4 rounded-full bg-nav-deep" />
+                        <span className="h-4 w-4 rounded-full bg-nav-deep" />
+                      </div>
+                    </>
+                  )}
                   <div className="mt-3 font-mono text-[10.5px] tracking-[0.12em] text-mono-muted">
                     {def.label} · {config.w} × {config.h} × {config.d} cm · {Math.round(capacity)} L usable
                   </div>
