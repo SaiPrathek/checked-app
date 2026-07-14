@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useUser } from "@clerk/nextjs";
-import type { BagId, Profile } from "./types";
+import { allocatedUnits, type Allocation, type BagId, type Profile } from "./types";
 import { PACKING_ITEMS } from "./packing-items";
 import { recommendedQty } from "./guidance";
 import { migrateProfile } from "./profile";
@@ -18,7 +18,8 @@ import { getMyProfile, saveProfile } from "./actions/profile";
 import {
   getMyList,
   toggleListItem as serverToggle,
-  assignBag as serverAssign,
+  setAllocation as serverSetAllocation,
+  setAllocations as serverSetAllocations,
   setQty as serverSetQty,
   importList,
 } from "./actions/list";
@@ -29,8 +30,8 @@ interface AppState {
   list: string[];
   /** per-item quantity; falls back to recommendedQty() when absent */
   qty: Record<string, number>;
-  /** which bag each listed item is assigned to in Weigh-In */
-  bags: Record<string, BagId | undefined>;
+  /** per-item, per-bag unit split; units not allocated are unpacked */
+  alloc: Record<string, Allocation>;
   hydrated: boolean;
   /** true when we've loaded state from the server (signed-in users only) */
   serverSynced: boolean;
@@ -40,7 +41,12 @@ interface AppState {
   isListed: (id: string) => boolean;
   setQtyForItem: (id: string, qty: number) => void;
   qtyFor: (id: string) => number;
+  /** legacy whole-item move: all units to one bag (undefined = unpack all) */
   assignBag: (id: string, bag: BagId | undefined) => void;
+  /** set how many units of an item sit in a specific bag */
+  setUnits: (id: string, bag: BagId, units: number) => void;
+  /** apply a full Auto-Pack loadsheet in one go */
+  applyLoadsheet: (allocMap: Record<string, Allocation>) => void;
   reset: () => void;
 }
 
@@ -51,11 +57,30 @@ interface Persisted {
   profile: Profile;
   list: string[];
   qty: Record<string, number>;
-  bags: Record<string, BagId | undefined>;
+  alloc: Record<string, Allocation>;
+}
+
+/** Legacy persisted shape had bags: Record<itemId, BagId>. */
+function migrateAlloc(parsed: {
+  alloc?: Record<string, Allocation>;
+  bags?: Record<string, BagId | undefined>;
+  qty?: Record<string, number>;
+  list?: string[];
+}): Record<string, Allocation> {
+  if (parsed.alloc) return parsed.alloc;
+  const out: Record<string, Allocation> = {};
+  if (parsed.bags) {
+    for (const [id, bag] of Object.entries(parsed.bags)) {
+      if (!bag) continue;
+      const qty = parsed.qty?.[id] ?? 1;
+      out[id] = { [bag]: qty };
+    }
+  }
+  return out;
 }
 
 function loadLocal(): Persisted {
-  if (typeof window === "undefined") return { profile: {}, list: [], qty: {}, bags: {} };
+  if (typeof window === "undefined") return { profile: {}, list: [], qty: {}, alloc: {} };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -64,24 +89,38 @@ function loadLocal(): Persisted {
         profile: migrateProfile(parsed.profile),
         list: parsed.list ?? [],
         qty: parsed.qty ?? {},
-        bags: parsed.bags ?? {},
+        alloc: migrateAlloc(parsed),
       };
     }
   } catch {
     /* ignore */
   }
-  return { profile: {}, list: [], qty: {}, bags: {} };
+  return { profile: {}, list: [], qty: {}, alloc: {} };
 }
 
 /** Lookup by id — cheap enough that we don't need to memoize. */
 const byId = new Map(PACKING_ITEMS.map((i) => [i.id, i]));
+
+/** Clamp an allocation so it never exceeds the item's qty. */
+function clampAlloc(a: Allocation, qty: number): Allocation {
+  const out: Allocation = {};
+  let used = 0;
+  for (const bag of ["cabin", "bag1", "bag2"] as BagId[]) {
+    const take = Math.min(Math.max(0, Math.floor(a[bag] ?? 0)), qty - used);
+    if (take > 0) {
+      out[bag] = take;
+      used += take;
+    }
+  }
+  return out;
+}
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn, user } = useUser();
   const [profile, setProfileState] = useState<Profile>({});
   const [list, setList] = useState<string[]>([]);
   const [qty, setQtyState] = useState<Record<string, number>>({});
-  const [bags, setBags] = useState<Record<string, BagId | undefined>>({});
+  const [alloc, setAllocState] = useState<Record<string, Allocation>>({});
   const [hydrated, setHydrated] = useState(false);
   const [serverSynced, setServerSynced] = useState(false);
 
@@ -94,7 +133,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProfileState(p.profile);
     setList(p.list);
     setQtyState(p.qty ?? {});
-    setBags(p.bags);
+    setAllocState(p.alloc ?? {});
     setHydrated(true);
   }, []);
 
@@ -130,25 +169,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
             local.list.map((id) => ({
               itemId: id,
               qty: local.qty?.[id] ?? 1,
-              bag: local.bags[id] ?? null,
+              allocation: local.alloc?.[id] ?? {},
             })),
           );
           setList(local.list);
           setQtyState(local.qty ?? {});
-          setBags(local.bags);
+          setAllocState(local.alloc ?? {});
         }
       } else {
         if (serverProfile) setProfileState(serverProfile);
         if (serverList.length) {
           setList(serverList.map((r) => r.itemId));
           const q: Record<string, number> = {};
-          const b: Record<string, BagId | undefined> = {};
+          const a: Record<string, Allocation> = {};
           for (const r of serverList) {
             q[r.itemId] = r.qty;
-            if (r.bag) b[r.itemId] = r.bag;
+            if (allocatedUnits(r.allocation) > 0) a[r.itemId] = r.allocation;
           }
           setQtyState(q);
-          setBags(b);
+          setAllocState(a);
         }
       }
       setServerSynced(true);
@@ -161,12 +200,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ profile, list, qty, bags }),
+        JSON.stringify({ profile, list, qty, alloc }),
       );
     } catch {
       /* ignore */
     }
-  }, [profile, list, qty, bags, hydrated]);
+  }, [profile, list, qty, alloc, hydrated]);
 
   const setProfile = useCallback(
     (p: Profile) => {
@@ -200,6 +239,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           delete next[id];
           return next;
         });
+        setAllocState((cur) => {
+          const next = { ...cur };
+          delete next[id];
+          return next;
+        });
       } else {
         const item = byId.get(id);
         const initial = item ? Math.max(1, recommendedQty(item, profile)) : 1;
@@ -224,22 +268,70 @@ export function AppProvider({ children }: { children: ReactNode }) {
           delete nx[id];
           return nx;
         });
+        setAllocState((cur) => {
+          const nx = { ...cur };
+          delete nx[id];
+          return nx;
+        });
       } else {
         setList((cur) => (cur.includes(id) ? cur : [...cur, id]));
         setQtyState((cur) => ({ ...cur, [id]: clean }));
+        // shrinking qty below what's packed → clamp the allocation
+        setAllocState((cur) => {
+          const a = cur[id];
+          if (!a || allocatedUnits(a) <= clean) return cur;
+          return { ...cur, [id]: clampAlloc(a, clean) };
+        });
       }
       if (isSignedIn) serverSetQty(id, clean).catch((e) => console.error("setQty", e));
     },
     [isSignedIn],
   );
 
+  const pushAllocation = useCallback(
+    (id: string, a: Allocation) => {
+      if (isSignedIn)
+        serverSetAllocation(id, a).catch((e) => console.error("setAllocation", e));
+    },
+    [isSignedIn],
+  );
+
   const assignBag = useCallback(
     (id: string, bag: BagId | undefined) => {
-      setBags((cur) => ({ ...cur, [id]: bag }));
-      if (isSignedIn)
-        serverAssign(id, (bag ?? null) as BagId | null).catch((e) =>
-          console.error("assignBag", e),
-        );
+      const a: Allocation = bag ? { [bag]: qtyFor(id) } : {};
+      setAllocState((cur) => ({ ...cur, [id]: a }));
+      pushAllocation(id, a);
+    },
+    [pushAllocation, qtyFor],
+  );
+
+  const setUnits = useCallback(
+    (id: string, bag: BagId, units: number) => {
+      setAllocState((cur) => {
+        const total = qtyFor(id);
+        const current = { ...(cur[id] ?? {}) };
+        const others = allocatedUnits(current) - (current[bag] ?? 0);
+        const clean = Math.max(0, Math.min(Math.floor(units), total - others));
+        if (clean > 0) current[bag] = clean;
+        else delete current[bag];
+        pushAllocation(id, current);
+        return { ...cur, [id]: current };
+      });
+    },
+    [pushAllocation, qtyFor],
+  );
+
+  const applyLoadsheet = useCallback(
+    (allocMap: Record<string, Allocation>) => {
+      setAllocState(allocMap);
+      if (isSignedIn) {
+        serverSetAllocations(
+          Object.entries(allocMap).map(([itemId, allocation]) => ({
+            itemId,
+            allocation,
+          })),
+        ).catch((e) => console.error("setAllocations", e));
+      }
     },
     [isSignedIn],
   );
@@ -248,7 +340,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     profile,
     list,
     qty,
-    bags,
+    alloc,
     hydrated,
     serverSynced,
     setProfile,
@@ -257,11 +349,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setQtyForItem,
     qtyFor,
     assignBag,
+    setUnits,
+    applyLoadsheet,
     reset: () => {
       setProfileState({});
       setList([]);
       setQtyState({});
-      setBags({});
+      setAllocState({});
     },
   };
 

@@ -83,6 +83,30 @@ export interface PackingItem {
   shareable?: boolean;
   /** Optional profile-aware display label. */
   nameFor?: (profile: Profile) => string;
+  /** Rough per-unit packed volume in litres (drives the space meters + Auto-Pack). */
+  volumeL?: number;
+  /**
+   * Airline/TSA transport rule for Auto-Pack and edit warnings.
+   * cabin "must"  → may ONLY travel in the cabin (documents, cash, lithium electronics, prescription meds)
+   * cabin "never" → may NOT travel in the cabin (blades, pressure cooker, >100ml liquids, bulk powders)
+   * cabin "prefer"→ allowed anywhere, cabin preferred when space permits
+   * omitted       → allowed anywhere, checked preferred
+   */
+  transport?: { cabin: "must" | "never" | "prefer"; note?: string };
+  /**
+   * Units Auto-Pack seeds into the cabin for resilience even when checked is
+   * preferred (e.g. 2 outfits in case checked bags are delayed).
+   */
+  cabinSeed?: number;
+}
+
+/** Units of one item per bag; units not allocated to any bag are unpacked. */
+export type Allocation = Partial<Record<BagId, number>>;
+
+/** Total units of an item currently allocated across all bags. */
+export function allocatedUnits(a: Allocation | undefined): number {
+  if (!a) return 0;
+  return (a.bag1 ?? 0) + (a.bag2 ?? 0) + (a.cabin ?? 0);
 }
 
 export interface Profile {

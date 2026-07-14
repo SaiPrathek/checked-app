@@ -5,26 +5,50 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { listItems } from "@/lib/db/schema";
 import { ensureUser } from "./user";
-import type { BagId } from "@/lib/types";
+import type { Allocation, BagId } from "@/lib/types";
 
 export interface ListRow {
   itemId: string;
   qty: number;
-  bag: BagId | null;
+  allocation: Allocation;
+}
+
+function cleanAllocation(a: Allocation | null | undefined, qty: number): Allocation {
+  const out: Allocation = {};
+  let used = 0;
+  for (const bag of ["cabin", "bag1", "bag2"] as BagId[]) {
+    const n = Math.max(0, Math.floor(a?.[bag] ?? 0));
+    const take = Math.min(n, qty - used);
+    if (take > 0) {
+      out[bag] = take;
+      used += take;
+    }
+  }
+  return out;
 }
 
 export async function getMyList(): Promise<ListRow[]> {
   const { userId } = await auth();
   if (!userId) return [];
   const rows = await db
-    .select({ itemId: listItems.itemId, qty: listItems.qty, bag: listItems.bag })
+    .select({
+      itemId: listItems.itemId,
+      qty: listItems.qty,
+      bag: listItems.bag,
+      allocation: listItems.allocation,
+    })
     .from(listItems)
     .where(eq(listItems.userId, userId));
-  return rows.map((r) => ({
-    itemId: r.itemId,
-    qty: r.qty,
-    bag: (r.bag ?? null) as BagId | null,
-  }));
+  return rows.map((r) => {
+    // migrate legacy single-bag rows on read: bag=X → all units in X
+    const legacy: Allocation | null =
+      !r.allocation && r.bag ? { [r.bag as BagId]: r.qty } : null;
+    return {
+      itemId: r.itemId,
+      qty: r.qty,
+      allocation: cleanAllocation((r.allocation as Allocation) ?? legacy, r.qty),
+    };
+  });
 }
 
 /**
@@ -52,6 +76,7 @@ export async function toggleListItem(
     itemId,
     qty: Math.max(1, Math.floor(initialQty)),
     bag: null,
+    allocation: null,
   });
   return { added: true };
 }
@@ -69,28 +94,49 @@ export async function setQty(itemId: string, qty: number): Promise<void> {
   }
   await db
     .insert(listItems)
-    .values({ userId, itemId, qty: clean, bag: null })
+    .values({ userId, itemId, qty: clean, bag: null, allocation: null })
     .onConflictDoUpdate({
       target: [listItems.userId, listItems.itemId],
       set: { qty: sql`excluded.qty` },
     });
 }
 
-export async function assignBag(itemId: string, bag: BagId | null): Promise<void> {
+/** Persist one item's per-bag unit split. Empty allocation = unpacked. */
+export async function setAllocation(
+  itemId: string,
+  allocation: Allocation,
+): Promise<void> {
   const userId = await ensureUser();
   if (!userId) throw new Error("Not signed in");
   await db
     .insert(listItems)
-    .values({ userId, itemId, bag })
+    .values({ userId, itemId, bag: null, allocation })
     .onConflictDoUpdate({
       target: [listItems.userId, listItems.itemId],
-      set: { bag: sql`excluded.bag` },
+      set: { allocation: sql`excluded.allocation`, bag: sql`NULL` },
     });
+}
+
+/** Persist a whole loadsheet (Auto-Pack result) in one round trip. */
+export async function setAllocations(
+  entries: { itemId: string; allocation: Allocation }[],
+): Promise<void> {
+  const userId = await ensureUser();
+  if (!userId) throw new Error("Not signed in");
+  for (const e of entries) {
+    await db
+      .insert(listItems)
+      .values({ userId, itemId: e.itemId, bag: null, allocation: e.allocation })
+      .onConflictDoUpdate({
+        target: [listItems.userId, listItems.itemId],
+        set: { allocation: sql`excluded.allocation`, bag: sql`NULL` },
+      });
+  }
 }
 
 /** Bulk-import a local list on first sign-in — used to migrate anonymous localStorage state. */
 export async function importList(
-  entries: { itemId: string; qty: number; bag: BagId | null }[],
+  entries: { itemId: string; qty: number; allocation: Allocation }[],
 ): Promise<void> {
   const userId = await ensureUser();
   if (!userId) throw new Error("Not signed in");
@@ -102,7 +148,8 @@ export async function importList(
         userId,
         itemId: e.itemId,
         qty: Math.max(1, Math.floor(e.qty)),
-        bag: e.bag,
+        bag: null,
+        allocation: e.allocation,
       })),
     )
     .onConflictDoNothing();

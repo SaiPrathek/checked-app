@@ -4,15 +4,30 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useApp } from "@/lib/store";
 import { PACKING_ITEMS } from "@/lib/packing-items";
-import { BAGS, type BagId, type Category, type PackingItem } from "@/lib/types";
+import {
+  BAGS,
+  allocatedUnits,
+  type BagId,
+  type Category,
+  type PackingItem,
+} from "@/lib/types";
+import {
+  bagSpecsFrom,
+  computeLoadsheet,
+  placementWarning,
+  unitVolumeL,
+  type LoadsheetNote,
+} from "@/lib/loadsheet";
 import { Meter } from "@/components/ui/meter";
 
 const byId = new Map(PACKING_ITEMS.map((item) => [item.id, item]));
 
-interface Line {
+/** Units of one item inside one bag (or the tray). */
+interface BagLine {
   item: PackingItem;
-  qty: number;
+  units: number;
   kg: number;
+  volL: number;
 }
 
 interface BagConfig {
@@ -36,21 +51,6 @@ const DEFAULT_CONFIG: Record<BagId, BagConfig> = {
   cabin: { preset: "cabin", w: 55, h: 40, d: 20 },
 };
 
-const ITEM_VOLUMES: Record<string, number> = {
-  passport: 0.5, "doc-copies": 0.5, photos: 0.1, rx: 0.8,
-  "otc-kit": 1, glasses: 0.4, "transit-jacket": 3, thermals: 2,
-  "heavy-coat": 8, "everyday-clothes": 18, shoes: 8, formal: 4,
-  ethnic: 3, cooker: 6, tava: 2, "kitchen-basics": 3, spices: 3,
-  instant: 4, snacks: 4, "rice-dal": 6, laptop: 3, phone: 0.5,
-  adapter: 0.6, appliance: 4, bedding: 12, toiletries: 3,
-  stationery: 4, forex: 0.1,
-};
-
-function lineVolume(line: Line): number {
-  const perItem = ITEM_VOLUMES[line.item.id] ?? Math.max(0.2, line.item.weightKg * 2.5);
-  return perItem * line.qty;
-}
-
 function rotationFor(id: string): number {
   let hash = 0;
   for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) % 97;
@@ -58,38 +58,60 @@ function rotationFor(id: string): number {
 }
 
 export default function WeighIn() {
-  const { list, bags, assignBag, qtyFor, hydrated } = useApp();
+  const { list, alloc, qtyFor, assignBag, setUnits, applyLoadsheet, hydrated } =
+    useApp();
   const [view, setView] = useState<"case" | "classic">("case");
   const [activeBag, setActiveBag] = useState<BagId>("bag1");
   const [bagConfig, setBagConfig] = useState<Record<BagId, BagConfig>>(DEFAULT_CONFIG);
+  const [notes, setNotes] = useState<LoadsheetNote[] | null>(null);
 
-  const lines = useMemo<Line[]>(
-    () => list
-      .map((id) => {
-        const item = byId.get(id);
-        if (!item) return null;
-        const qty = qtyFor(id);
-        return { item, qty, kg: item.weightKg * qty };
-      })
-      .filter((line): line is Line => Boolean(line)),
-    [list, qtyFor],
+  const items = useMemo(
+    () =>
+      list
+        .map((id) => byId.get(id))
+        .filter((item): item is PackingItem => Boolean(item)),
+    [list],
   );
 
-  const columns = useMemo(() => {
-    const unassigned = lines.filter((line) => !bags[line.item.id]);
-    const perBag: Record<BagId, Line[]> = { bag1: [], bag2: [], cabin: [] };
-    for (const line of lines) {
-      const bag = bags[line.item.id];
-      if (bag) perBag[bag].push(line);
+  const { perBag, tray, violations, totalPackedKg } = useMemo(() => {
+    const perBag: Record<BagId, BagLine[]> = { bag1: [], bag2: [], cabin: [] };
+    const tray: BagLine[] = [];
+    const violations: string[] = [];
+    let totalPackedKg = 0;
+    for (const item of items) {
+      const qty = qtyFor(item.id);
+      const a = alloc[item.id] ?? {};
+      for (const bagId of ["bag1", "bag2", "cabin"] as BagId[]) {
+        const units = a[bagId] ?? 0;
+        if (units <= 0) continue;
+        perBag[bagId].push({
+          item,
+          units,
+          kg: item.weightKg * units,
+          volL: unitVolumeL(item) * units,
+        });
+        totalPackedKg += item.weightKg * units;
+        const warning = placementWarning(item, bagId);
+        if (warning) violations.push(warning);
+      }
+      const unassigned = qty - allocatedUnits(a);
+      if (unassigned > 0) {
+        tray.push({
+          item,
+          units: unassigned,
+          kg: item.weightKg * unassigned,
+          volL: unitVolumeL(item) * unassigned,
+        });
+      }
     }
-    return { unassigned, perBag };
-  }, [bags, lines]);
+    return { perBag, tray, violations, totalPackedKg };
+  }, [items, alloc, qtyFor]);
 
   if (!hydrated) {
     return <p className="font-mono text-xs text-mono-muted">LOADING…</p>;
   }
 
-  if (lines.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="mx-auto max-w-md py-16 text-center">
         <div className="mb-2 font-mono text-[11px] tracking-[0.2em] text-mono-muted">
@@ -108,17 +130,26 @@ export default function WeighIn() {
 
   const bag = BAGS.find((candidate) => candidate.id === activeBag) ?? BAGS[0];
   const config = bagConfig[activeBag];
-  const packedLines = columns.perBag[activeBag];
+  const packedLines = perBag[activeBag];
   const kg = packedLines.reduce((sum, line) => sum + line.kg, 0);
-  const packedVolume = packedLines.reduce((sum, line) => sum + lineVolume(line), 0);
-  const capacity = (config.w * config.h * config.d) / 1000 * 0.85;
+  const packedVolume = packedLines.reduce((sum, line) => sum + line.volL, 0);
+  const capacity = ((config.w * config.h * config.d) / 1000) * 0.85;
   const weightOver = kg > bag.limitKg;
   const volumeOver = packedVolume > capacity;
   const caseW = Math.round(Math.min(320, Math.max(120, config.w * 3.4)));
   const caseH = Math.round(Math.min(320, Math.max(120, config.h * 3.6)));
-  const totalPackedKg = lines
-    .filter((line) => bags[line.item.id])
-    .reduce((sum, line) => sum + line.kg, 0);
+
+  function runAutoPack() {
+    const lines = items.map((item) => ({ item, qty: qtyFor(item.id) }));
+    const dims = {
+      bag1: bagConfig.bag1,
+      bag2: bagConfig.bag2,
+      cabin: bagConfig.cabin,
+    };
+    const result = computeLoadsheet(lines, bagSpecsFrom(dims));
+    applyLoadsheet(result.alloc);
+    setNotes(result.notes);
+  }
 
   function setPreset(presetId: string) {
     const preset = PRESETS.find((candidate) => candidate.id === presetId);
@@ -152,14 +183,61 @@ export default function WeighIn() {
           </div>
           <h1 className="m-0 font-display text-[34px] font-bold tracking-[-0.02em]">Weigh-In</h1>
           <p className="mt-1.5 max-w-[520px] text-[14.5px] text-ink-muted">
-            Pick a suitcase, tweak its dimensions if needed, then tap items in the tray to pack them. The meters track weight and space live.
+            Hit Auto-Pack to get an optimal, rule-aware loadsheet — or pack by hand. Tap items to move them; the meters track weight and space live.
           </p>
         </div>
-        <div className="text-right">
-          <div className="font-mono text-[22px] font-bold">{totalPackedKg.toFixed(1)} kg</div>
-          <div className="font-mono text-[10px] tracking-[0.16em] text-mono-muted">TOTAL PACKED</div>
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={runAutoPack}
+            className="flex h-11 items-center gap-2 rounded-[9px] bg-accent px-5 text-[14.5px] font-semibold text-accent-ink hover:brightness-[0.96]"
+          >
+            ✈ Auto-Pack
+          </button>
+          <div className="text-right">
+            <div className="font-mono text-[22px] font-bold">{totalPackedKg.toFixed(1)} kg</div>
+            <div className="font-mono text-[10px] tracking-[0.16em] text-mono-muted">TOTAL PACKED</div>
+          </div>
         </div>
       </div>
+
+      {notes && notes.length > 0 && (
+        <section className="flex flex-col gap-2 rounded-2xl border border-card-border bg-card p-4 shadow-[0_12px_26px_-24px_rgba(20,26,38,0.5)]">
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-[10.5px] tracking-[0.18em] text-accent">▸ LOADSHEET NOTES</span>
+            <button
+              type="button"
+              onClick={() => setNotes(null)}
+              className="font-mono text-[10.5px] tracking-[0.1em] text-mono-muted hover:text-ink"
+            >
+              DISMISS
+            </button>
+          </div>
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+            {notes.map((note, index) => (
+              <li
+                key={index}
+                className={note.level === "warn"
+                  ? "text-[13px] font-semibold text-over"
+                  : "text-[13px] text-ink-muted"}
+              >
+                {note.level === "warn" ? "⚠ " : "· "}
+                {note.text}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {violations.length > 0 && (
+        <div className="flex flex-col gap-1 rounded-xl border border-[#f2c9c2] bg-[#fbe8e5] px-4 py-3">
+          {violations.map((violation, index) => (
+            <p key={index} className="m-0 text-[12.5px] font-semibold text-[#b23127]">
+              ⚠ {violation}
+            </p>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2.5">
         <span className="mr-1 font-mono text-[10px] tracking-[0.16em] text-mono-muted">VIEW</span>
@@ -171,7 +249,7 @@ export default function WeighIn() {
         <div className="flex flex-col gap-5">
           <div className="flex flex-wrap gap-2" role="tablist" aria-label="Suitcases">
             {BAGS.map((candidate) => {
-              const bagKg = columns.perBag[candidate.id].reduce((sum, line) => sum + line.kg, 0);
+              const bagKg = perBag[candidate.id].reduce((sum, line) => sum + line.kg, 0);
               const active = activeBag === candidate.id;
               const over = bagKg > candidate.limitKg;
               return (
@@ -204,22 +282,33 @@ export default function WeighIn() {
               <div className="flex items-baseline justify-between gap-3">
                 <h2 className="m-0 font-display text-[16px] font-bold">Tray</h2>
                 <span className="font-mono text-[10px] tracking-[0.14em] text-mono-muted">
-                  {columns.unassigned.length} UNPACKED
+                  {tray.length} UNPACKED
                 </span>
               </div>
               <p className="m-0 text-[12.5px] text-ink-muted">
                 Tap an item to pack it into <strong>{bag.label}</strong>. Tap a packed item to take it back out.
               </p>
-              {columns.unassigned.length > 0 ? (
+              {tray.length > 0 ? (
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(118px,1fr))] gap-2">
-                  {columns.unassigned.map((line) => (
+                  {tray.map((line) => (
                     <button
                       key={line.item.id}
                       type="button"
                       title={`Pack into ${bag.label}`}
-                      onClick={() => assignBag(line.item.id, activeBag)}
-                      className="flex flex-col items-center gap-1.5 rounded-[10px] border border-card-border bg-card px-2 py-2.5"
+                      onClick={() =>
+                        setUnits(
+                          line.item.id,
+                          activeBag,
+                          (alloc[line.item.id]?.[activeBag] ?? 0) + line.units,
+                        )
+                      }
+                      className="relative flex flex-col items-center gap-1.5 rounded-[10px] border border-card-border bg-card px-2 py-2.5"
                     >
+                      {line.units > 1 && (
+                        <span className="absolute right-1.5 top-1.5 rounded-full bg-ink px-1.5 py-0.5 font-mono text-[9px] font-bold text-nav-text">
+                          ×{line.units}
+                        </span>
+                      )}
                       <CategoryIcon category={line.item.category} size={32} />
                       <span className="text-center text-[11.5px] font-semibold leading-[1.25] text-ink">{line.item.name}</span>
                       <span className="font-mono text-[10px] text-mono-muted">{line.kg.toFixed(1)} kg</span>
@@ -272,22 +361,27 @@ export default function WeighIn() {
                     <div className="absolute bottom-0 right-[14%] top-0 w-[9px] bg-accent opacity-90" />
                     <div className="absolute inset-[9px] flex flex-wrap-reverse content-start justify-center gap-[3px] overflow-hidden rounded-[10px] border-2 border-dashed border-[#d8cebb] bg-[#fbf6ea] p-[5px]">
                       {packedLines.length > 0 ? packedLines.map((line) => {
-                        const size = Math.round(Math.min(Math.min(caseW, caseH) * 0.42, Math.max(26, Math.sqrt(lineVolume(line)) * 15)));
+                        const size = Math.round(Math.min(Math.min(caseW, caseH) * 0.42, Math.max(26, Math.sqrt(line.volL) * 15)));
                         return (
                           <button
                             key={line.item.id}
                             type="button"
-                            title={`${line.item.name} · ${line.kg.toFixed(1)} kg — tap to unpack`}
-                            onClick={() => assignBag(line.item.id, undefined)}
-                            className="grid place-items-center rounded-lg border-2 border-card-border bg-card animate-[ck-drop_.45s_cubic-bezier(.2,.8,.3,1.15)]"
+                            title={`${line.item.name}${line.units > 1 ? ` ×${line.units}` : ""} · ${line.kg.toFixed(1)} kg — tap to unpack`}
+                            onClick={() => setUnits(line.item.id, activeBag, 0)}
+                            className="relative grid place-items-center rounded-lg border-2 border-card-border bg-card animate-[ck-drop_.45s_cubic-bezier(.2,.8,.3,1.15)]"
                             style={{ width: size, height: size, transform: `rotate(${rotationFor(line.item.id)}deg)` }}
                           >
+                            {line.units > 1 && (
+                              <span className="absolute right-0.5 top-0.5 rounded-full bg-ink px-1 py-px font-mono text-[8px] font-bold text-nav-text">
+                                ×{line.units}
+                              </span>
+                            )}
                             <CategoryIcon category={line.item.category} size={Math.round(size * 0.7)} />
                           </button>
                         );
                       }) : (
                         <div className="grid h-full w-full place-items-center text-center font-mono text-[10px] leading-[1.8] tracking-[0.12em] text-[#a79e8b]">
-                          TAP TRAY ITEMS<br />TO PACK
+                          TAP TRAY ITEMS<br />TO PACK — OR ✈ AUTO-PACK
                         </div>
                       )}
                     </div>
@@ -318,17 +412,27 @@ export default function WeighIn() {
         </div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5">
-          <ClassicColumn title="Unpacked" lines={columns.unassigned} onDrop={(event) => onDrop(event, undefined)} onAssign={assignBag} currentBag="" />
+          <ClassicColumn
+            title="Unpacked"
+            lines={tray}
+            onDrop={(event) => onDrop(event, undefined)}
+            onMoveAll={assignBag}
+            bagId=""
+            setUnits={setUnits}
+            qtyFor={qtyFor}
+          />
           {BAGS.map((candidate) => (
             <ClassicColumn
               key={candidate.id}
               title={candidate.label}
-              lines={columns.perBag[candidate.id]}
+              lines={perBag[candidate.id]}
               limitKg={candidate.limitKg}
               config={bagConfig[candidate.id]}
               onDrop={(event) => onDrop(event, candidate.id)}
-              onAssign={assignBag}
-              currentBag={candidate.id}
+              onMoveAll={assignBag}
+              bagId={candidate.id}
+              setUnits={setUnits}
+              qtyFor={qtyFor}
             />
           ))}
         </div>
@@ -362,10 +466,30 @@ function Metric({ label, value, limit, unit, round = false }: { label: string; v
   );
 }
 
-function ClassicColumn({ title, lines, limitKg, config, onDrop, onAssign, currentBag }: { title: string; lines: Line[]; limitKg?: number; config?: BagConfig; onDrop: (event: React.DragEvent) => void; onAssign: (id: string, bag: BagId | undefined) => void; currentBag: BagId | "" }) {
+function ClassicColumn({
+  title,
+  lines,
+  limitKg,
+  config,
+  onDrop,
+  onMoveAll,
+  bagId,
+  setUnits,
+  qtyFor,
+}: {
+  title: string;
+  lines: BagLine[];
+  limitKg?: number;
+  config?: BagConfig;
+  onDrop: (event: React.DragEvent) => void;
+  onMoveAll: (id: string, bag: BagId | undefined) => void;
+  bagId: BagId | "";
+  setUnits: (id: string, bag: BagId, units: number) => void;
+  qtyFor: (id: string) => number;
+}) {
   const kg = lines.reduce((sum, line) => sum + line.kg, 0);
-  const volume = lines.reduce((sum, line) => sum + lineVolume(line), 0);
-  const capacity = config ? (config.w * config.h * config.d) / 1000 * 0.85 : 0;
+  const volume = lines.reduce((sum, line) => sum + line.volL, 0);
+  const capacity = config ? ((config.w * config.h * config.d) / 1000) * 0.85 : 0;
   const over = limitKg !== undefined && kg > limitKg;
   const volumeOver = Boolean(config && volume > capacity);
   const preset = PRESETS.find((candidate) => candidate.id === config?.preset);
@@ -377,12 +501,25 @@ function ClassicColumn({ title, lines, limitKg, config, onDrop, onAssign, curren
         {(over || volumeOver) && <p className="m-0 text-[12px] font-semibold text-over">{over ? `Over by ${(kg - (limitKg ?? 0)).toFixed(1)} kg — offload something.` : "Out of space — bigger case or unpack."}</p>}
       </div>
       <div className="flex flex-1 flex-col gap-2">
-        {lines.map((line) => (
-          <div key={line.item.id} draggable onDragStart={(event) => event.dataTransfer.setData("text/plain", line.item.id)} className="cursor-grab rounded-[9px] border border-card-border bg-card px-2.5 py-2 active:cursor-grabbing">
-            <div className="flex items-center gap-2"><CategoryIcon category={line.item.category} size={20} /><span className="min-w-0 flex-1 truncate text-[13px] font-medium">{line.item.name}</span><span className="shrink-0 font-mono text-[11px] text-mono-muted">{line.kg.toFixed(1)} kg</span></div>
-            <select value={currentBag} onChange={(event) => onAssign(line.item.id, (event.target.value || undefined) as BagId | undefined)} className="mt-[7px] w-full cursor-pointer rounded-md border border-card-border bg-field px-2 py-1 font-mono text-[10.5px] text-ink-muted" aria-label={`Move ${line.item.name}`}><option value="">◦ Unpacked</option><option value="bag1">→ Checked Bag 1</option><option value="bag2">→ Checked Bag 2</option><option value="cabin">→ Cabin</option></select>
-          </div>
-        ))}
+        {lines.map((line) => {
+          const total = qtyFor(line.item.id);
+          const warning = bagId ? placementWarning(line.item, bagId) : null;
+          return (
+            <div key={line.item.id} draggable onDragStart={(event) => event.dataTransfer.setData("text/plain", line.item.id)} className="cursor-grab rounded-[9px] border border-card-border bg-card px-2.5 py-2 active:cursor-grabbing">
+              <div className="flex items-center gap-2"><CategoryIcon category={line.item.category} size={20} /><span className="min-w-0 flex-1 truncate text-[13px] font-medium">{line.item.name}</span><span className="shrink-0 font-mono text-[11px] text-mono-muted">{line.units > 1 ? `×${line.units} · ` : ""}{line.kg.toFixed(1)} kg</span></div>
+              {warning && <p className="m-0 mt-1 text-[11px] font-semibold text-[#b23127]">⚠ {warning}</p>}
+              {bagId && total > 1 && (
+                <div className="mt-[7px] flex items-center gap-1.5 font-mono text-[10.5px] text-ink-muted">
+                  <span className="tracking-[0.08em]">HERE</span>
+                  <button type="button" aria-label={`Fewer ${line.item.name} in ${title}`} onClick={() => setUnits(line.item.id, bagId, line.units - 1)} className="grid h-6 w-6 place-items-center rounded border border-field-border bg-field hover:bg-divider">−</button>
+                  <span className="w-8 text-center text-ink">{line.units}/{total}</span>
+                  <button type="button" aria-label={`More ${line.item.name} in ${title}`} onClick={() => setUnits(line.item.id, bagId, line.units + 1)} className="grid h-6 w-6 place-items-center rounded border border-field-border bg-field hover:bg-divider">+</button>
+                </div>
+              )}
+              <select value={bagId} onChange={(event) => onMoveAll(line.item.id, (event.target.value || undefined) as BagId | undefined)} className="mt-[7px] w-full cursor-pointer rounded-md border border-card-border bg-field px-2 py-1 font-mono text-[10.5px] text-ink-muted" aria-label={`Move all ${line.item.name}`}><option value="">◦ Unpacked (all)</option><option value="bag1">→ Checked Bag 1 (all)</option><option value="bag2">→ Checked Bag 2 (all)</option><option value="cabin">→ Cabin (all)</option></select>
+            </div>
+          );
+        })}
         {lines.length === 0 && <div className="grid min-h-[60px] flex-1 place-items-center rounded-[9px] border border-dashed border-[#d8cebb] font-mono text-[11px] tracking-[0.1em] text-[#a79e8b]">DROP ITEMS HERE</div>}
       </div>
     </div>

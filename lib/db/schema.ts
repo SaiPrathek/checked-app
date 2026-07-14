@@ -59,7 +59,10 @@ export const listItems = pgTable(
     itemId: text("item_id").notNull(),
     /** How many of this item the user plans to pack; drives weight × qty. */
     qty: integer("qty").notNull().default(1),
+    /** Legacy single-bag assignment; superseded by allocation. Read-only for migration. */
     bag: text("bag"),
+    /** Per-bag unit split, e.g. {"bag1":8,"bag2":6}. Null = unpacked (or legacy bag). */
+    allocation: jsonb("allocation"),
     addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({ pk: primaryKey({ columns: [t.userId, t.itemId] }) }),
