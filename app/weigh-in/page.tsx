@@ -4,349 +4,402 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useApp } from "@/lib/store";
 import { PACKING_ITEMS } from "@/lib/packing-items";
-import { BAGS, type BagId, type PackingItem } from "@/lib/types";
+import { BAGS, type BagId, type Category, type PackingItem } from "@/lib/types";
 import { Meter } from "@/components/ui/meter";
 
-const byId = new Map(PACKING_ITEMS.map((i) => [i.id, i]));
+const byId = new Map(PACKING_ITEMS.map((item) => [item.id, item]));
 
-/** A listed item paired with the user's chosen qty — the actual weighing unit. */
 interface Line {
   item: PackingItem;
   qty: number;
-  /** total weight for the line = item.weightKg * qty */
   kg: number;
 }
 
-type BagView = "unassigned" | BagId;
+interface BagConfig {
+  preset: string;
+  w: number;
+  h: number;
+  d: number;
+}
+
+const PRESETS = [
+  { id: "cabin", label: "Cabin 55 cm", w: 55, h: 40, d: 20 },
+  { id: "medium", label: "Medium 24″", w: 61, h: 43, d: 26 },
+  { id: "large", label: "Large 28″", w: 71, h: 48, d: 30 },
+  { id: "trunk", label: "Trunk 30″", w: 76, h: 52, d: 32 },
+  { id: "custom", label: "Custom" },
+] as const;
+
+const DEFAULT_CONFIG: Record<BagId, BagConfig> = {
+  bag1: { preset: "large", w: 71, h: 48, d: 30 },
+  bag2: { preset: "medium", w: 61, h: 43, d: 26 },
+  cabin: { preset: "cabin", w: 55, h: 40, d: 20 },
+};
+
+const ITEM_VOLUMES: Record<string, number> = {
+  passport: 0.5, "doc-copies": 0.5, photos: 0.1, rx: 0.8,
+  "otc-kit": 1, glasses: 0.4, "transit-jacket": 3, thermals: 2,
+  "heavy-coat": 8, "everyday-clothes": 18, shoes: 8, formal: 4,
+  ethnic: 3, cooker: 6, tava: 2, "kitchen-basics": 3, spices: 3,
+  instant: 4, snacks: 4, "rice-dal": 6, laptop: 3, phone: 0.5,
+  adapter: 0.6, appliance: 4, bedding: 12, toiletries: 3,
+  stationery: 4, forex: 0.1,
+};
+
+function lineVolume(line: Line): number {
+  const perItem = ITEM_VOLUMES[line.item.id] ?? Math.max(0.2, line.item.weightKg * 2.5);
+  return perItem * line.qty;
+}
+
+function rotationFor(id: string): number {
+  let hash = 0;
+  for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) % 97;
+  return (hash % 13) - 6;
+}
 
 export default function WeighIn() {
   const { list, bags, assignBag, qtyFor, hydrated } = useApp();
-  const [activeView, setActiveView] = useState<BagView>("unassigned");
+  const [view, setView] = useState<"case" | "classic">("case");
+  const [activeBag, setActiveBag] = useState<BagId>("bag1");
+  const [bagConfig, setBagConfig] = useState<Record<BagId, BagConfig>>(DEFAULT_CONFIG);
 
   const lines = useMemo<Line[]>(
-    () =>
-      list
-        .map((id) => {
-          const item = byId.get(id);
-          if (!item) return null;
-          const qty = qtyFor(id);
-          return { item, qty, kg: item.weightKg * qty };
-        })
-        .filter((x): x is Line => !!x),
+    () => list
+      .map((id) => {
+        const item = byId.get(id);
+        if (!item) return null;
+        const qty = qtyFor(id);
+        return { item, qty, kg: item.weightKg * qty };
+      })
+      .filter((line): line is Line => Boolean(line)),
     [list, qtyFor],
   );
 
   const columns = useMemo(() => {
-    const unassigned = lines.filter((l) => !bags[l.item.id]);
+    const unassigned = lines.filter((line) => !bags[line.item.id]);
     const perBag: Record<BagId, Line[]> = { bag1: [], bag2: [], cabin: [] };
-    for (const l of lines) {
-      const b = bags[l.item.id];
-      if (b) perBag[b].push(l);
+    for (const line of lines) {
+      const bag = bags[line.item.id];
+      if (bag) perBag[bag].push(line);
     }
     return { unassigned, perBag };
-  }, [lines, bags]);
+  }, [bags, lines]);
 
-  const totalKg = lines.reduce((s, l) => s + l.kg, 0);
-  const unpackedKg = columns.unassigned.reduce((sum, line) => sum + line.kg, 0);
-  const activeBag = BAGS.find((bag) => bag.id === activeView);
-  const activeLines = activeView === "unassigned"
-    ? columns.unassigned
-    : columns.perBag[activeView];
-  const activeKg = activeLines.reduce((sum, line) => sum + line.kg, 0);
-
-  if (!hydrated)
+  if (!hydrated) {
     return <p className="font-mono text-xs text-mono-muted">LOADING…</p>;
+  }
 
   if (lines.length === 0) {
     return (
       <div className="mx-auto max-w-md py-16 text-center">
         <div className="mb-2 font-mono text-[11px] tracking-[0.2em] text-mono-muted">
-          GATE C2 · CK 03
+          GATE C2 · CK 03 · BAGGAGE LAB
         </div>
-        <h1 className="m-0 font-display text-[34px] font-bold tracking-[-0.02em]">
-          Weigh-In
-        </h1>
+        <h1 className="m-0 font-display text-[34px] font-bold tracking-[-0.02em]">Weigh-In</h1>
         <p className="mx-auto mt-3 max-w-sm text-ink-muted">
-          Nothing to weigh yet. Add items in The Manifest, then come back to pack
-          them into bags.
+          Nothing to weigh yet. Add items in The Manifest, then come back to pack them into bags.
         </p>
-        <Link
-          href="/manifest"
-          className="mt-5 inline-flex h-11 items-center rounded-[9px] bg-accent px-5 text-[14.5px] font-semibold text-accent-ink"
-        >
+        <Link href="/manifest" className="mt-5 inline-flex h-11 items-center rounded-[9px] bg-accent px-5 text-[14.5px] font-semibold text-accent-ink">
           Go to The Manifest →
         </Link>
       </div>
     );
   }
 
-  function onDrop(e: React.DragEvent, bag: BagId | undefined) {
-    e.preventDefault();
-    const id = e.dataTransfer.getData("text/plain");
-    if (id) {
-      assignBag(id, bag);
-      setActiveView(bag ?? "unassigned");
-    }
+  const bag = BAGS.find((candidate) => candidate.id === activeBag) ?? BAGS[0];
+  const config = bagConfig[activeBag];
+  const packedLines = columns.perBag[activeBag];
+  const kg = packedLines.reduce((sum, line) => sum + line.kg, 0);
+  const packedVolume = packedLines.reduce((sum, line) => sum + lineVolume(line), 0);
+  const capacity = (config.w * config.h * config.d) / 1000 * 0.85;
+  const weightOver = kg > bag.limitKg;
+  const volumeOver = packedVolume > capacity;
+  const caseW = Math.round(Math.min(320, Math.max(120, config.w * 3.4)));
+  const caseH = Math.round(Math.min(320, Math.max(120, config.h * 3.6)));
+  const totalPackedKg = lines
+    .filter((line) => bags[line.item.id])
+    .reduce((sum, line) => sum + line.kg, 0);
+
+  function setPreset(presetId: string) {
+    const preset = PRESETS.find((candidate) => candidate.id === presetId);
+    setBagConfig((current) => ({
+      ...current,
+      [activeBag]: preset && "w" in preset
+        ? { preset: presetId, w: preset.w, h: preset.h, d: preset.d }
+        : { ...current[activeBag], preset: presetId },
+    }));
+  }
+
+  function setDimension(key: "w" | "h" | "d", value: number) {
+    setBagConfig((current) => ({
+      ...current,
+      [activeBag]: { ...current[activeBag], preset: "custom", [key]: value },
+    }));
+  }
+
+  function onDrop(event: React.DragEvent, destination: BagId | undefined) {
+    event.preventDefault();
+    const id = event.dataTransfer.getData("text/plain");
+    if (id) assignBag(id, destination);
   }
 
   return (
-    <div className="flex flex-col gap-[22px]">
+    <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3.5">
         <div>
           <div className="mb-2 font-mono text-[11px] tracking-[0.2em] text-mono-muted">
-            GATE C2 · CK 03
+            GATE C2 · CK 03 · BAGGAGE LAB
           </div>
-          <h1 className="m-0 font-display text-[34px] font-bold tracking-[-0.02em]">
-            Weigh-In
-          </h1>
+          <h1 className="m-0 font-display text-[34px] font-bold tracking-[-0.02em]">Weigh-In</h1>
           <p className="mt-1.5 max-w-[520px] text-[14.5px] text-ink-muted">
-            Drag items into a bag (or use the menu). Watch the meters — green is
-            good, amber is close, red is over the limit.
+            Pick a suitcase, tweak its dimensions if needed, then tap items in the tray to pack them. The meters track weight and space live.
           </p>
         </div>
         <div className="text-right">
-          <div className="font-mono text-[22px] font-bold">
-            {totalKg.toFixed(1)} kg
-          </div>
-          <div className="font-mono text-[10px] tracking-[0.16em] text-mono-muted">
-            TOTAL PLANNED · {columns.unassigned.length} UNPACKED
-          </div>
+          <div className="font-mono text-[22px] font-bold">{totalPackedKg.toFixed(1)} kg</div>
+          <div className="font-mono text-[10px] tracking-[0.16em] text-mono-muted">TOTAL PACKED</div>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-card-border bg-[#f6f1e6] px-4 py-3">
-        <span className="font-mono text-[10.5px] font-bold tracking-[0.16em] text-mono-muted">
-          BAGGAGE ALLOWANCE
-        </span>
-        <div className="flex flex-wrap gap-x-5 gap-y-1 font-mono text-[11px] text-ink-muted">
-          <span>2 × 23 KG CHECKED</span>
-          <span>7 KG CABIN</span>
-          <span>53 KG TOTAL</span>
-        </div>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <span className="mr-1 font-mono text-[10px] tracking-[0.16em] text-mono-muted">VIEW</span>
+        <ViewButton active={view === "case"} onClick={() => setView("case")}>Suitcase</ViewButton>
+        <ViewButton active={view === "classic"} onClick={() => setView("classic")}>Classic list</ViewButton>
       </div>
 
-      <div
-        role="tablist"
-        aria-label="Baggage compartments"
-        className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-3"
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeView === "unassigned"}
-          aria-controls="bag-workspace"
-          onClick={() => setActiveView("unassigned")}
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={(event) => onDrop(event, undefined)}
-          className={activeView === "unassigned"
-            ? "rounded-[14px] border border-nav bg-nav p-4 text-left text-nav-text shadow-[0_14px_28px_-22px_rgba(6,12,24,0.8)]"
-            : "rounded-[14px] border border-card-border bg-card p-4 text-left transition-colors hover:border-primary"}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <span className={activeView === "unassigned"
-                ? "block font-mono text-[9.5px] tracking-[0.14em] text-nav-muted"
-                : "block font-mono text-[9.5px] tracking-[0.14em] text-mono-muted"}
-              >
-                STAGING AREA
-              </span>
-              <span className="mt-1 block font-display text-[17px] font-bold">Unpacked</span>
-            </div>
-            <span className={activeView === "unassigned"
-              ? "rounded-full bg-[#ffffff14] px-2.5 py-1 font-mono text-[11px]"
-              : "rounded-full bg-panel px-2.5 py-1 font-mono text-[11px] text-ink-muted"}
-            >
-              {columns.unassigned.length}
-            </span>
-          </div>
-          <div className={activeView === "unassigned"
-            ? "mt-4 font-mono text-[20px] font-bold text-accent"
-            : "mt-4 font-mono text-[20px] font-bold text-ink"}
-          >
-            {unpackedKg.toFixed(1)} kg
-          </div>
-          <div className={activeView === "unassigned"
-            ? "mt-1 text-[11.5px] text-nav-muted"
-            : "mt-1 text-[11.5px] text-ink-muted"}
-          >
-            Assign these items to a bag
-          </div>
-        </button>
-
-        {BAGS.map((bag) => {
-          const items = columns.perBag[bag.id];
-          const kg = items.reduce((s, l) => s + l.kg, 0);
-          const over = kg > bag.limitKg;
-          const remaining = Math.abs(bag.limitKg - kg);
-          const selected = activeView === bag.id;
-          return (
-            <button
-              key={bag.id}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              aria-controls="bag-workspace"
-              onClick={() => setActiveView(bag.id)}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => onDrop(event, bag.id)}
-              className={selected
-                ? "rounded-[14px] border border-nav bg-nav p-4 text-left text-nav-text shadow-[0_14px_28px_-22px_rgba(6,12,24,0.8)]"
-                : "rounded-[14px] border border-card-border bg-card p-4 text-left transition-colors hover:border-primary"}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <span className={selected
-                    ? "block font-mono text-[9.5px] tracking-[0.14em] text-nav-muted"
-                    : "block font-mono text-[9.5px] tracking-[0.14em] text-mono-muted"}
+      {view === "case" ? (
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Suitcases">
+            {BAGS.map((candidate) => {
+              const bagKg = columns.perBag[candidate.id].reduce((sum, line) => sum + line.kg, 0);
+              const active = activeBag === candidate.id;
+              const over = bagKg > candidate.limitKg;
+              return (
+                <button
+                  key={candidate.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setActiveBag(candidate.id)}
+                  className={active
+                    ? "h-10 rounded-full border border-nav-deep bg-ink px-4 text-[13.5px] font-semibold text-nav-text"
+                    : "h-10 rounded-full border border-field-border bg-card px-4 text-[13.5px] font-semibold text-ink-muted"}
+                >
+                  {candidate.label}
+                  <span className={over
+                    ? "ml-2 font-mono text-[10.5px] text-[#f08a7f]"
+                    : active
+                      ? "ml-2 font-mono text-[10.5px] text-accent"
+                      : "ml-2 font-mono text-[10.5px] text-mono-muted"}
                   >
-                    {bag.id === "cabin" ? "CARRY-ON" : "CHECKED"}
+                    {bagKg.toFixed(1)}/{candidate.limitKg} kg
                   </span>
-                  <span className="mt-1 block font-display text-[17px] font-bold">{bag.label}</span>
-                </div>
-                <span className={selected
-                  ? "rounded-full bg-[#ffffff14] px-2.5 py-1 font-mono text-[11px]"
-                  : "rounded-full bg-panel px-2.5 py-1 font-mono text-[11px] text-ink-muted"}
-                >
-                  {items.length}
-                </span>
-              </div>
-              <div className="mt-4 flex items-baseline justify-between gap-2">
-                <span className={over
-                  ? "font-mono text-[20px] font-bold text-over"
-                  : selected
-                    ? "font-mono text-[20px] font-bold text-accent"
-                    : "font-mono text-[20px] font-bold text-ink"}
-                >
-                  {kg.toFixed(1)} kg
-                </span>
-                <span className={selected
-                  ? "font-mono text-[10.5px] text-nav-muted"
-                  : "font-mono text-[10.5px] text-mono-muted"}
-                >
-                  / {bag.limitKg} kg
-                </span>
-              </div>
-              <Meter value={kg} limit={bag.limitKg} className="mt-2" />
-              <div className={over
-                ? "mt-2 text-[11.5px] font-semibold text-over"
-                : selected
-                  ? "mt-2 text-[11.5px] text-nav-muted"
-                  : "mt-2 text-[11.5px] text-ink-muted"}
-              >
-                {over ? `${remaining.toFixed(1)} kg over limit` : `${remaining.toFixed(1)} kg remaining`}
-              </div>
-            </button>
-          );
-        })}
-      </div>
+                </button>
+              );
+            })}
+          </div>
 
-      <BagWorkspace
-        title={activeBag?.label ?? "Unpacked"}
-        eyebrow={activeBag ? `${activeBag.limitKg} KG LIMIT` : "STAGING AREA"}
-        lines={activeLines}
-        kg={activeKg}
-        limitKg={activeBag?.limitKg}
-        onDrop={(event) => onDrop(event, activeBag?.id)}
-        onAssign={assignBag}
-        currentBag={activeBag?.id ?? ""}
-      />
+          <div className="grid items-stretch gap-[18px] lg:grid-cols-[minmax(280px,1fr)_minmax(360px,1.5fr)]">
+            <section className="flex min-w-0 flex-col gap-3 rounded-2xl border border-card-border bg-panel p-5">
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 className="m-0 font-display text-[16px] font-bold">Tray</h2>
+                <span className="font-mono text-[10px] tracking-[0.14em] text-mono-muted">
+                  {columns.unassigned.length} UNPACKED
+                </span>
+              </div>
+              <p className="m-0 text-[12.5px] text-ink-muted">
+                Tap an item to pack it into <strong>{bag.label}</strong>. Tap a packed item to take it back out.
+              </p>
+              {columns.unassigned.length > 0 ? (
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(118px,1fr))] gap-2">
+                  {columns.unassigned.map((line) => (
+                    <button
+                      key={line.item.id}
+                      type="button"
+                      title={`Pack into ${bag.label}`}
+                      onClick={() => assignBag(line.item.id, activeBag)}
+                      className="flex flex-col items-center gap-1.5 rounded-[10px] border border-card-border bg-card px-2 py-2.5"
+                    >
+                      <CategoryIcon category={line.item.category} size={32} />
+                      <span className="text-center text-[11.5px] font-semibold leading-[1.25] text-ink">{line.item.name}</span>
+                      <span className="font-mono text-[10px] text-mono-muted">{line.kg.toFixed(1)} kg</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid min-h-20 flex-1 place-items-center rounded-[9px] border border-dashed border-[#d8cebb] text-center font-mono text-[11px] tracking-[0.1em] text-[#a79e8b]">
+                  ALL ITEMS PACKED<br />READY FOR THE COUNTER
+                </div>
+              )}
+            </section>
+
+            <section className="flex min-w-0 flex-col gap-4 rounded-2xl border border-card-border bg-card p-5 shadow-[0_12px_26px_-24px_rgba(20,26,38,0.5)]">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="mr-1 font-mono text-[10px] tracking-[0.16em] text-mono-muted">LUGGAGE</span>
+                {PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => setPreset(preset.id)}
+                    className={config.preset === preset.id
+                      ? "h-8 rounded-full border border-accent bg-[#fbf1dc] px-[13px] font-mono text-[11px] font-bold text-[#9a5b00]"
+                      : "h-8 rounded-full border border-field-border bg-field px-[13px] font-mono text-[11px] text-ink-muted"}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
+              {config.preset === "custom" && (
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3.5 rounded-[10px] border border-card-border bg-panel px-3.5 py-3">
+                  <Dimension label="WIDTH" value={config.w} min={30} max={90} onChange={(value) => setDimension("w", value)} />
+                  <Dimension label="HEIGHT" value={config.h} min={30} max={90} onChange={(value) => setDimension("h", value)} />
+                  <Dimension label="DEPTH" value={config.d} min={12} max={40} onChange={(value) => setDimension("d", value)} />
+                </div>
+              )}
+
+              <div className="flex min-h-[300px] items-end justify-center px-0 pb-0 pt-2.5">
+                <div className="flex max-w-full flex-col items-center">
+                  <div className="h-[18px] w-16 rounded-t-[10px] border-4 border-b-0 border-nav-deep" />
+                  <div className="h-10 max-w-full transition-[width] duration-300" style={{ width: caseW, perspective: 220 }}>
+                    <div className="h-full w-full origin-bottom rounded-[14px_14px_6px_6px] border-[3px] border-nav-deep bg-[#1b2c44] shadow-[inset_0_-8px_0_rgba(255,255,255,0.07)]" style={{ transform: "rotateX(58deg)" }} />
+                  </div>
+                  <div
+                    className={weightOver || volumeOver ? "relative max-w-full animate-[ck-shake_.5s_ease-in-out_infinite] rounded-2xl border-[3px] border-nav-deep bg-ink shadow-[0_22px_34px_-22px_rgba(6,12,24,0.65)] transition-[width,height] duration-300" : "relative max-w-full rounded-2xl border-[3px] border-nav-deep bg-ink shadow-[0_22px_34px_-22px_rgba(6,12,24,0.65)] transition-[width,height] duration-300"}
+                    style={{ width: caseW, height: caseH }}
+                  >
+                    <div className="absolute bottom-0 left-[14%] top-0 w-[9px] bg-accent opacity-90" />
+                    <div className="absolute bottom-0 right-[14%] top-0 w-[9px] bg-accent opacity-90" />
+                    <div className="absolute inset-[9px] flex flex-wrap-reverse content-start justify-center gap-[3px] overflow-hidden rounded-[10px] border-2 border-dashed border-[#d8cebb] bg-[#fbf6ea] p-[5px]">
+                      {packedLines.length > 0 ? packedLines.map((line) => {
+                        const size = Math.round(Math.min(Math.min(caseW, caseH) * 0.42, Math.max(26, Math.sqrt(lineVolume(line)) * 15)));
+                        return (
+                          <button
+                            key={line.item.id}
+                            type="button"
+                            title={`${line.item.name} · ${line.kg.toFixed(1)} kg — tap to unpack`}
+                            onClick={() => assignBag(line.item.id, undefined)}
+                            className="grid place-items-center rounded-lg border-2 border-card-border bg-card animate-[ck-drop_.45s_cubic-bezier(.2,.8,.3,1.15)]"
+                            style={{ width: size, height: size, transform: `rotate(${rotationFor(line.item.id)}deg)` }}
+                          >
+                            <CategoryIcon category={line.item.category} size={Math.round(size * 0.7)} />
+                          </button>
+                        );
+                      }) : (
+                        <div className="grid h-full w-full place-items-center text-center font-mono text-[10px] leading-[1.8] tracking-[0.12em] text-[#a79e8b]">
+                          TAP TRAY ITEMS<br />TO PACK
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-[-3px] flex max-w-full justify-between px-[22px] transition-[width] duration-300" style={{ width: caseW }}>
+                    <span className="h-4 w-4 rounded-full bg-nav-deep" />
+                    <span className="h-4 w-4 rounded-full bg-nav-deep" />
+                  </div>
+                  <div className="mt-3 font-mono text-[10.5px] tracking-[0.12em] text-mono-muted">
+                    {config.w} × {config.h} × {config.d} cm · {Math.round(capacity)} L usable
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
+                <Metric label="WEIGHT" value={kg} limit={bag.limitKg} unit="kg" />
+                <Metric label="SPACE" value={packedVolume} limit={capacity} unit="L" round />
+              </div>
+              {(weightOver || volumeOver) && (
+                <p className="m-0 text-[13px] font-semibold text-over">
+                  {weightOver
+                    ? `Over the airline limit by ${(kg - bag.limitKg).toFixed(1)} kg — take something out.`
+                    : "Out of space — pick a bigger case or unpack something."}
+                </p>
+              )}
+            </section>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5">
+          <ClassicColumn title="Unpacked" lines={columns.unassigned} onDrop={(event) => onDrop(event, undefined)} onAssign={assignBag} currentBag="" />
+          {BAGS.map((candidate) => (
+            <ClassicColumn
+              key={candidate.id}
+              title={candidate.label}
+              lines={columns.perBag[candidate.id]}
+              limitKg={candidate.limitKg}
+              config={bagConfig[candidate.id]}
+              onDrop={(event) => onDrop(event, candidate.id)}
+              onAssign={assignBag}
+              currentBag={candidate.id}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function BagWorkspace({
-  title,
-  eyebrow,
-  lines,
-  kg,
-  limitKg,
-  onDrop,
-  onAssign,
-  currentBag,
-}: {
-  title: string;
-  eyebrow: string;
-  lines: Line[];
-  kg: number;
-  limitKg?: number;
-  onDrop: (e: React.DragEvent) => void;
-  onAssign: (id: string, bag: BagId | undefined) => void;
-  currentBag: BagId | "";
-}) {
-  const over = limitKg !== undefined && kg > limitKg;
-  return (
-    <div
-      id="bag-workspace"
-      role="tabpanel"
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={onDrop}
-      className="overflow-hidden rounded-[14px] border border-card-border bg-card shadow-[0_12px_26px_-24px_rgba(20,26,38,0.5)]"
-    >
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-card-border bg-[#f6f1e6] px-4 py-3.5">
-        <div>
-          <span className="block font-mono text-[9.5px] font-bold tracking-[0.16em] text-mono-muted">
-            {eyebrow}
-          </span>
-          <h2 className="mt-1 font-display text-[20px] font-bold">{title}</h2>
-        </div>
-        <div className="text-right">
-          <span className={over
-            ? "block font-mono text-[18px] font-bold text-over"
-            : "block font-mono text-[18px] font-bold text-ink"}
-          >
-            {kg.toFixed(1)} kg
-          </span>
-          <span className="font-mono text-[9.5px] tracking-[0.12em] text-mono-muted">
-            {lines.length} ITEM{lines.length === 1 ? "" : "S"}
-          </span>
-        </div>
-      </div>
+function ViewButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return <button type="button" onClick={onClick} className={active ? "h-8 rounded-full border border-nav-deep bg-ink px-3.5 text-[12.5px] font-semibold text-accent" : "h-8 rounded-full border border-field-border bg-card px-3.5 text-[12.5px] font-semibold text-ink-muted"}>{children}</button>;
+}
 
-      <div>
-        {lines.map((l) => (
-          <div
-            key={l.item.id}
-            draggable
-            onDragStart={(e) => e.dataTransfer.setData("text/plain", l.item.id)}
-            className="grid cursor-grab gap-3 border-t border-divider p-4 first:border-t-0 active:cursor-grabbing sm:grid-cols-[minmax(0,1fr)_auto_190px] sm:items-center"
-          >
-            <div className="min-w-0">
-              <span className="block truncate text-[14px] font-semibold">{l.item.name}</span>
-              <span className="mt-0.5 block font-mono text-[10px] tracking-[0.08em] text-mono-muted">
-                DRAG TO A BAG ABOVE
-              </span>
-            </div>
-            <span className="whitespace-nowrap font-mono text-[12px] text-ink-muted">
-              ×{l.qty} · {l.kg.toFixed(1)} kg
-            </span>
-            <select
-              value={currentBag}
-              onChange={(e) =>
-                onAssign(l.item.id, (e.target.value || undefined) as BagId | undefined)
-              }
-              className="h-9 w-full cursor-pointer appearance-none rounded-[7px] border border-field-border bg-field px-2.5 font-mono text-[10.5px] tracking-[0.04em] text-ink-muted"
-              aria-label={`Move ${l.item.name}`}
-            >
-              <option value="">◦ Unpacked</option>
-              <option value="bag1">→ Checked Bag 1</option>
-              <option value="bag2">→ Checked Bag 2</option>
-              <option value="cabin">→ Cabin</option>
-            </select>
+function Dimension({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {
+  return (
+    <label className="flex flex-col gap-1.5 font-mono text-[10px] tracking-[0.14em] text-mono-muted">
+      <span>{label} · {value} CM</span>
+      <input type="range" min={min} max={max} value={value} onChange={(event) => onChange(Number(event.target.value))} className="w-full accent-accent" />
+    </label>
+  );
+}
+
+function Metric({ label, value, limit, unit, round = false }: { label: string; value: number; limit: number; unit: string; round?: boolean }) {
+  const display = round ? `${value.toFixed(0)} / ${Math.round(limit)} ${unit}` : `${value.toFixed(1)} / ${limit} ${unit}`;
+  return (
+    <div className="flex flex-col gap-2 rounded-[10px] border border-card-border bg-field px-3.5 py-3">
+      <div className="flex justify-between font-mono text-[10px] tracking-[0.16em] text-mono-muted">
+        <span>{label}</span><span className={value > limit ? "text-over" : ""}>{display}</span>
+      </div>
+      <Meter value={value} limit={limit} />
+    </div>
+  );
+}
+
+function ClassicColumn({ title, lines, limitKg, config, onDrop, onAssign, currentBag }: { title: string; lines: Line[]; limitKg?: number; config?: BagConfig; onDrop: (event: React.DragEvent) => void; onAssign: (id: string, bag: BagId | undefined) => void; currentBag: BagId | "" }) {
+  const kg = lines.reduce((sum, line) => sum + line.kg, 0);
+  const volume = lines.reduce((sum, line) => sum + lineVolume(line), 0);
+  const capacity = config ? (config.w * config.h * config.d) / 1000 * 0.85 : 0;
+  const over = limitKg !== undefined && kg > limitKg;
+  const volumeOver = Boolean(config && volume > capacity);
+  const preset = PRESETS.find((candidate) => candidate.id === config?.preset);
+  return (
+    <div onDrop={onDrop} onDragOver={(event) => event.preventDefault()} className="flex min-h-[220px] flex-col gap-2.5 rounded-[14px] border border-card-border bg-panel p-3.5">
+      <div className="flex flex-col gap-2">
+        <div className="flex items-baseline justify-between gap-2"><span className="font-display text-[15px] font-bold">{title}</span>{limitKg !== undefined && <span className={over ? "font-mono text-[12px] text-over" : "font-mono text-[12px] text-mono-muted"}>{kg.toFixed(1)}/{limitKg} kg</span>}</div>
+        {limitKg !== undefined && <><Meter value={kg} limit={limitKg} /><Meter value={volume} limit={capacity} className="h-[5px]" /><div className="flex justify-between gap-2 font-mono text-[9.5px] tracking-[0.1em] text-[#a79e8b]"><span>SPACE {volume.toFixed(0)}/{Math.round(capacity)} L</span><span>{preset?.label.toUpperCase()}</span></div></>}
+        {(over || volumeOver) && <p className="m-0 text-[12px] font-semibold text-over">{over ? `Over by ${(kg - (limitKg ?? 0)).toFixed(1)} kg — offload something.` : "Out of space — bigger case or unpack."}</p>}
+      </div>
+      <div className="flex flex-1 flex-col gap-2">
+        {lines.map((line) => (
+          <div key={line.item.id} draggable onDragStart={(event) => event.dataTransfer.setData("text/plain", line.item.id)} className="cursor-grab rounded-[9px] border border-card-border bg-card px-2.5 py-2 active:cursor-grabbing">
+            <div className="flex items-center gap-2"><CategoryIcon category={line.item.category} size={20} /><span className="min-w-0 flex-1 truncate text-[13px] font-medium">{line.item.name}</span><span className="shrink-0 font-mono text-[11px] text-mono-muted">{line.kg.toFixed(1)} kg</span></div>
+            <select value={currentBag} onChange={(event) => onAssign(line.item.id, (event.target.value || undefined) as BagId | undefined)} className="mt-[7px] w-full cursor-pointer rounded-md border border-card-border bg-field px-2 py-1 font-mono text-[10.5px] text-ink-muted" aria-label={`Move ${line.item.name}`}><option value="">◦ Unpacked</option><option value="bag1">→ Checked Bag 1</option><option value="bag2">→ Checked Bag 2</option><option value="cabin">→ Cabin</option></select>
           </div>
         ))}
-        {lines.length === 0 && (
-          <div className="grid min-h-[150px] place-items-center p-5 text-center">
-            <div>
-              <div className="font-mono text-[11px] font-bold tracking-[0.14em] text-[#a79e8b]">
-                DROP ITEMS HERE
-              </div>
-              <p className="mb-0 mt-2 text-[13px] text-ink-muted">
-                This compartment is empty.
-              </p>
-            </div>
-          </div>
-        )}
+        {lines.length === 0 && <div className="grid min-h-[60px] flex-1 place-items-center rounded-[9px] border border-dashed border-[#d8cebb] font-mono text-[11px] tracking-[0.1em] text-[#a79e8b]">DROP ITEMS HERE</div>}
       </div>
     </div>
   );
+}
+
+function CategoryIcon({ category, size }: { category: Category; size: number }) {
+  const common = { width: size, height: size, viewBox: "0 0 48 48", className: "shrink-0" };
+  const outline = "#14202e";
+  if (category === "documents") return <svg {...common}><rect x="11" y="7" width="26" height="34" rx="4" fill="#1466d8" stroke={outline} strokeWidth="2.5" /><circle cx="24" cy="19" r="6" fill="#f5a623" stroke={outline} strokeWidth="2" /><path d="M17 32h14" stroke="#fbf6ea" strokeWidth="2.5" strokeLinecap="round" /></svg>;
+  if (category === "clothing") return <svg {...common}><path d="M17 10 22 7h4l5 3 8 6-5 6-3-2v20H15V20l-3 2-5-6z" fill="#4fcb8b" stroke={outline} strokeWidth="2.5" strokeLinejoin="round" /><path d="M20 8c1 4 7 4 8 0" fill="none" stroke={outline} strokeWidth="2.5" strokeLinecap="round" /></svg>;
+  if (category === "kitchen") return <svg {...common}><circle cx="24" cy="11" r="3" fill="#f5a623" stroke={outline} strokeWidth="2" /><ellipse cx="24" cy="18" rx="14" ry="4.5" fill="#8fa3c4" stroke={outline} strokeWidth="2.5" /><path d="M10 18v10c0 6 6 10 14 10s14-4 14-10V18" fill="#8fa3c4" stroke={outline} strokeWidth="2.5" strokeLinejoin="round" /></svg>;
+  if (category === "food") return <svg {...common}><rect x="13" y="8" width="22" height="7" rx="2.5" fill={outline} stroke={outline} strokeWidth="2.5" /><path d="M15 15h18v20a5 5 0 0 1-5 5h-8a5 5 0 0 1-5-5z" fill="#f5a623" stroke={outline} strokeWidth="2.5" /><rect x="19" y="22" width="10" height="9" rx="2" fill="#fbf6ea" stroke={outline} strokeWidth="2" /></svg>;
+  if (category === "medicines") return <svg {...common}><rect x="8" y="13" width="32" height="26" rx="5" fill="#fbf6ea" stroke={outline} strokeWidth="2.5" /><path d="M18 13v-3a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v3" fill="none" stroke={outline} strokeWidth="2.5" /><path d="M21 21h6v5h5v6h-5v5h-6v-5h-5v-6h5z" fill="#d23b2e" stroke={outline} strokeWidth="2" /></svg>;
+  if (category === "electronics") return <svg {...common}><rect x="11" y="9" width="26" height="18" rx="3" fill={outline} stroke={outline} strokeWidth="2.5" /><rect x="14" y="12" width="20" height="12" rx="1.5" fill="#1466d8" /><path d="m8 33 3-6h26l3 6a3 3 0 0 1-3 4H11a3 3 0 0 1-3-4z" fill="#8fa3c4" stroke={outline} strokeWidth="2.5" /></svg>;
+  if (category === "bedding") return <svg {...common}><path d="M10 14c8-4 20-4 28 0-2 8-2 12 0 20-8 4-20 4-28 0 2-8 2-12 0-20z" fill="#e7f0fb" stroke={outline} strokeWidth="2.5" /><path d="M16 20c5-2 11-2 16 0" fill="none" stroke="#8fa3c4" strokeWidth="2.5" strokeLinecap="round" /></svg>;
+  if (category === "toiletries") return <svg {...common}><rect x="19" y="6" width="10" height="7" rx="2" fill={outline} stroke={outline} strokeWidth="2" /><path d="M17 15h14v20a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6z" fill="#1257b8" stroke={outline} strokeWidth="2.5" /><rect x="20" y="22" width="8" height="8" rx="2" fill="#fbf6ea" /></svg>;
+  if (category === "money") return <svg {...common}><rect x="7" y="13" width="34" height="22" rx="4" fill="#147a48" stroke={outline} strokeWidth="2.5" /><path d="M7 18h34v5H7z" fill={outline} /><rect x="12" y="27" width="12" height="4" rx="1.5" fill="#fbf6ea" /></svg>;
+  return <svg {...common}><rect x="9" y="12" width="30" height="26" rx="4" fill="#e4dccb" stroke={outline} strokeWidth="2.5" /></svg>;
 }

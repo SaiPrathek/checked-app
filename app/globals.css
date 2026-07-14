@@ -74,3 +74,15 @@ body {
     opacity: 0.15;
   }
 }
+
+@keyframes ck-drop {
+  0% { transform: translateY(-46px) scale(0.5) rotate(-8deg); opacity: 0; }
+  70% { transform: translateY(4px) scale(1.05); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes ck-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px) rotate(-0.5deg); }
+  75% { transform: translateX(4px) rotate(0.5deg); }
+}
