@@ -139,6 +139,12 @@ export interface BagDef {
   class: BagClass;
   /** false → always present and cannot be removed */
   removable: boolean;
+  /**
+   * Personal item that rides under the seat — the quick-access bag.
+   * Auto-Pack fills it first with must-carry essentials (laptop, documents,
+   * meds, cash) and a spare outfit, and keeps bulky cabin items out of it.
+   */
+  quickAccess?: boolean;
 }
 
 /** Every bag the app knows about. Which are *active* is per-user (see store.activeBags). */
@@ -146,7 +152,7 @@ export const BAG_CATALOG: BagDef[] = [
   { id: "bag1", label: "Checked Bag 1", limitKg: 23, class: "checked", removable: true },
   { id: "bag2", label: "Checked Bag 2", limitKg: 23, class: "checked", removable: true },
   { id: "cabin", label: "Cabin", limitKg: 7, class: "cabin", removable: true },
-  { id: "backpack", label: "Backpack", limitKg: 7, class: "cabin", removable: true },
+  { id: "backpack", label: "Backpack", limitKg: 7, class: "cabin", removable: true, quickAccess: true },
 ];
 
 /** Default fleet for a new user: two checked bags + cabin (no backpack). */

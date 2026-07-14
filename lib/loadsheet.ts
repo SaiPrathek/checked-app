@@ -30,6 +30,8 @@ export interface BagSpec {
   id: BagId;
   limitKg: number;
   class: BagClass;
+  /** personal item under the seat — filled first with quick-access essentials */
+  quickAccess?: boolean;
   /** usable capacity in litres (dimensions × fill efficiency) */
   capacityL: number;
 }
@@ -87,6 +89,18 @@ function unitsThatFit(bag: BagState, wKg: number, vL: number, want: number): num
   return Math.max(0, Math.min(want, byWeight, byVolume));
 }
 
+/**
+ * Order cabin-class bags by role. quickFirst=true puts the personal item
+ * (backpack) first — for must-carry essentials and the resilience seed, which
+ * belong under the seat. quickFirst=false puts the overhead roller first — for
+ * bulky cabin-prefer items, keeping the small quick-access bag uncluttered.
+ * Stable sort, so catalog order breaks ties (deterministic).
+ */
+function cabinByRole(cabinBags: BagState[], quickFirst: boolean): BagState[] {
+  const key = (b: BagState) => (b.quickAccess ? 0 : 1);
+  return [...cabinBags].sort((a, b) => (quickFirst ? key(a) - key(b) : key(b) - key(a)));
+}
+
 /** Fill a list of bags in order with as many units as fit; returns units left. */
 function fillInto(
   alloc: Record<string, Allocation>,
@@ -122,6 +136,11 @@ export function computeLoadsheet(
 
   const hasCabin = cabinBags.length > 0;
   const hasChecked = checkedBags.length > 0;
+  // Under-the-seat essentials go to the personal item (backpack) first;
+  // bulky cabin items go to the overhead roller first.
+  const quickAccessFirst = cabinByRole(cabinBags, true);
+  const rollerFirst = cabinByRole(cabinBags, false);
+  const hasBackpack = cabinBags.some((b) => b.quickAccess);
 
   // Stable input order: heaviest total line first, id tiebreak (determinism).
   const sorted = [...lines]
@@ -134,7 +153,7 @@ export function computeLoadsheet(
   // ── Phase 1 · cabin-must: documents, cash, lithium electronics, meds ──────
   for (const l of sorted) {
     if (l.item.transport?.cabin !== "must") continue;
-    const target = hasCabin ? cabinBags : checkedBags; // no cabin bag → forced to checked
+    const target = hasCabin ? quickAccessFirst : checkedBags; // backpack first, else forced to checked
     const left = fillInto(alloc, target, l.item, l.qty);
     if (left > 0) unplaced.push({ itemId: l.item.id, name: l.item.name, units: left });
     if (!hasCabin) {
@@ -161,14 +180,16 @@ export function computeLoadsheet(
       const already = allocatedUnits(alloc[l.item.id]);
       const wantable = Math.min(seed, l.qty - already);
       if (wantable <= 0) continue;
-      const left = fillInto(alloc, cabinBags, l.item, wantable);
+      const left = fillInto(alloc, quickAccessFirst, l.item, wantable);
       if (left < wantable) seeded = true;
     }
   }
   if (seeded) {
     notes.push({
       level: "info",
-      text: "Seeded spare clothes into your cabin bag — if a checked bag is delayed, you're covered for the first days.",
+      text: hasBackpack
+        ? "Seeded a spare outfit into your backpack — quick to reach, and if a checked bag is delayed you're covered for the first days."
+        : "Seeded spare clothes into your cabin bag — if a checked bag is delayed, you're covered for the first days.",
     });
   }
 
@@ -179,7 +200,7 @@ export function computeLoadsheet(
     const remaining = l.qty - already;
     if (remaining <= 0) continue;
     const before = remaining;
-    const left = fillInto(alloc, cabinBags, l.item, remaining);
+    const left = fillInto(alloc, rollerFirst, l.item, remaining);
     if (left < before && l.item.transport.note) {
       ruleNotes.add(`${l.item.name} → cabin: ${l.item.transport.note}`);
     }
@@ -208,9 +229,9 @@ export function computeLoadsheet(
       if (spread > 1) ruleNotes.add(`${l.item.name} split across bags to stay under the limits.`);
     }
 
-    // overflow → cabin-class, unless banned there
+    // overflow → cabin-class (roller first), unless banned there
     if (remaining > 0 && l.item.transport?.cabin !== "never" && hasCabin) {
-      remaining = fillInto(alloc, cabinBags, l.item, remaining);
+      remaining = fillInto(alloc, rollerFirst, l.item, remaining);
     }
 
     if (remaining > 0) {
@@ -308,6 +329,7 @@ export function bagSpecsFrom(
       id: b.id,
       limitKg: b.limitKg,
       class: b.class,
+      quickAccess: b.quickAccess,
       capacityL: d ? ((d.w * d.h * d.d) / 1000) * 0.85 : 0,
     };
   });

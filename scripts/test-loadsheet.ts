@@ -146,6 +146,10 @@ console.log("Scenario 7 · backpack (cabin-class) fleet");
   };
   check("passport lands in a cabin-class bag", mustInCabinClass("passport"));
   check("laptop lands in a cabin-class bag", mustInCabinClass("laptop"));
+  // must-carry essentials prefer the backpack (personal item, under the seat)
+  check("laptop in the backpack, not the cabin roller", (r.alloc["laptop"]?.backpack ?? 0) === 1 && !r.alloc["laptop"]?.cabin);
+  check("passport in the backpack", (r.alloc["passport"]?.backpack ?? 0) === 1);
+  check("forex in the backpack", (r.alloc["forex"]?.backpack ?? 0) === 1);
   check("cooker NOT in cabin or backpack", !r.alloc["cooker"]?.cabin && !r.alloc["cooker"]?.backpack);
   check("kitchen-basics (knife) NOT in backpack", !r.alloc["kitchen-basics"]?.backpack);
   check("no bag2 allocations exist", !Object.values(r.alloc).some((a) => (a.bag2 ?? 0) > 0));
@@ -172,6 +176,36 @@ console.log("Scenario 9 · no cabin-class bag");
   const r = computeLoadsheet(input, specs(["bag1", "bag2"]));
   check("must-carry items still placed (in checked)", allocatedUnits(r.alloc["passport"]) === 1 && allocatedUnits(r.alloc["laptop"]) === 1);
   check("warns cabin bag is missing", r.notes.some((n) => n.text.toLowerCase().includes("cabin")));
+}
+
+// ─── Scenario 10: quick-access — backpack gets essentials + spare outfit ─────
+console.log("Scenario 10 · backpack is the quick-access bag");
+{
+  const input = lines([
+    ["passport", 1], ["laptop", 1], ["phone", 1], ["rx", 1], ["forex", 1],
+    ["glasses", 2], ["transit-jacket", 1], ["adapter", 2],
+    ["everyday-clothes", 14], ["shoes", 2], ["toiletries", 1],
+  ]);
+  // full fleet + backpack: 2 checked + cabin roller + backpack
+  const r = computeLoadsheet(input, specs(["bag1", "bag2", "cabin", "backpack"]));
+
+  // must-carry quick-access essentials → backpack
+  for (const id of ["passport", "laptop", "phone", "rx", "forex"]) {
+    check(`${id} in backpack`, (r.alloc[id]?.backpack ?? 0) >= 1, JSON.stringify(r.alloc[id]));
+  }
+  // spare outfit seeded into the backpack (quick access, delay insurance)
+  check("spare outfit seeded in backpack", (r.alloc["everyday-clothes"]?.backpack ?? 0) >= 2,
+    `backpack clothes = ${r.alloc["everyday-clothes"]?.backpack}`);
+  check("nothing seeded to cabin roller for clothes", !(r.alloc["everyday-clothes"]?.cabin),
+    `cabin clothes = ${r.alloc["everyday-clothes"]?.cabin}`);
+  // bulky cabin-prefer items stay OUT of the small backpack — go to the roller
+  check("transit jacket in cabin roller, not backpack", (r.alloc["transit-jacket"]?.cabin ?? 0) === 1 && !r.alloc["transit-jacket"]?.backpack);
+  check("adapters prefer the cabin roller", (r.alloc["adapter"]?.cabin ?? 0) >= 1);
+  // backpack within its 7 kg limit
+  check("backpack within 7 kg", r.totals.backpack.kg <= 7 + 1e-9, `${r.totals.backpack.kg.toFixed(1)} kg`);
+  // note mentions the backpack
+  check("seed note mentions backpack", r.notes.some((n) => n.text.toLowerCase().includes("backpack")));
+  console.log(`    backpack ${r.totals.backpack.kg.toFixed(1)}kg/${r.totals.backpack.volL.toFixed(0)}L · cabin ${r.totals.cabin.kg.toFixed(1)}kg/${r.totals.cabin.volL.toFixed(0)}L`);
 }
 
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : `\n${failures} FAILURES`);
