@@ -503,7 +503,11 @@ function BoardingPass({
         <div className="flex flex-col gap-2 sm:pl-5">
           <ReviewChip label="HOUSING" value={profile.housing && PROFILE_LABELS.housing[profile.housing]} onClick={() => onEdit("housing")} />
           <ReviewChip label="HOUSEHOLD" value={profile.roommates && PROFILE_LABELS.roommates[profile.roommates]} onClick={() => onEdit("roommates")} />
-          <ReviewChip label="DEFAULTS" value={profile.gender && PROFILE_LABELS.gender[profile.gender]} onClick={() => onEdit("gender")} />
+          <ReviewChip
+            label="DEFAULTS · OPTIONAL"
+            value={profile.gender ? PROFILE_LABELS.gender[profile.gender] : "Skipped"}
+            onClick={() => onEdit("gender")}
+          />
         </div>
         <div className="flex flex-col gap-2">
           <ReviewChip label="DIET" value={profile.dietPractice && PROFILE_LABELS.dietPractice[profile.dietPractice]} onClick={() => onEdit("dietPractice")} />
@@ -521,8 +525,7 @@ function BoardingPass({
         <p className="m-0 text-[13px] text-ink-muted">Tap any field to re-answer just that question.</p>
         <button
           onClick={onConfirm}
-          disabled={!hasRequiredCheckInAnswers(profile)}
-          className="h-11 rounded-[9px] bg-accent px-6 text-[14.5px] font-semibold text-accent-ink disabled:opacity-50"
+          className="h-11 rounded-[9px] bg-accent px-6 text-[14.5px] font-semibold text-accent-ink transition-colors hover:bg-[#e99a17]"
         >
           Confirm & see my Manifest →
         </button>

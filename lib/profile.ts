@@ -44,7 +44,6 @@ export function hasRequiredCheckInAnswers(profile: Profile): boolean {
       profile.intake &&
       profile.housing &&
       profile.roommates &&
-      profile.gender &&
       profile.dietPractice &&
       profile.cuisine &&
       profile.cooking &&
