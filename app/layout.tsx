@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import { AppProvider } from "@/lib/store";
 import { Nav } from "@/components/nav";
@@ -65,22 +66,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html
-      lang="en"
-      className={`${display.variable} ${sans.variable} ${mono.variable}`}
-    >
-      <body className="bg-paper text-ink">
-        <AppProvider>
-          <Nav />
-          <main className="mx-auto max-w-[1120px] px-5 pb-20 pt-7">
-            {children}
-          </main>
-          <footer className="mx-auto flex max-w-[1120px] items-center justify-center gap-2 px-5 py-8 text-center font-mono text-[10px] uppercase tracking-[0.16em] text-mono-muted">
-            <LogoMark className="h-5 w-5 flex-shrink-0" />
-            <span>Checked · checked.co.in · v0 · verdicts sourced from The Hold — corpus/README.md</span>
-          </footer>
-        </AppProvider>
-      </body>
-    </html>
+    <ClerkProvider>
+      <html
+        lang="en"
+        className={`${display.variable} ${sans.variable} ${mono.variable}`}
+      >
+        <body className="bg-paper text-ink">
+          <AppProvider>
+            <Nav />
+            <main className="mx-auto max-w-[1120px] px-5 pb-20 pt-7">
+              {children}
+            </main>
+            <footer className="mx-auto flex max-w-[1120px] items-center justify-center gap-2 px-5 py-8 text-center font-mono text-[10px] uppercase tracking-[0.16em] text-mono-muted">
+              <LogoMark className="h-5 w-5 flex-shrink-0" />
+              <span>Checked · checked.co.in · v0 · verdicts sourced from The Hold — corpus/README.md</span>
+            </footer>
+          </AppProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

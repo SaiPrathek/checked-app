@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { LogoMark } from "@/components/logo";
 
@@ -20,6 +21,7 @@ const TICKER = [
 
 export function Nav() {
   const pathname = usePathname();
+  const { isLoaded, isSignedIn } = useUser();
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-nav-border bg-nav">
@@ -33,25 +35,44 @@ export function Nav() {
               DEPARTURES
             </span>
           </Link>
-          <nav className="hidden flex-wrap justify-end gap-0.5 sm:flex">
-            {LINKS.map((l) => {
-              const active = pathname === l.href;
-              return (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  className={cn(
-                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                    active
-                      ? "bg-nav-border text-nav-text"
-                      : "text-[#7c90b0] hover:text-nav-text",
-                  )}
-                >
-                  {l.label}
-                </Link>
-              );
-            })}
-          </nav>
+          <div className="flex items-center gap-3">
+            <nav className="hidden flex-wrap justify-end gap-0.5 sm:flex">
+              {LINKS.map((l) => {
+                const active = pathname === l.href;
+                return (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    className={cn(
+                      "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                      active
+                        ? "bg-nav-border text-nav-text"
+                        : "text-[#7c90b0] hover:text-nav-text",
+                    )}
+                  >
+                    {l.label}
+                  </Link>
+                );
+              })}
+            </nav>
+            <div className="ml-1 flex items-center">
+              {!isLoaded ? (
+                <span className="h-8 w-8" aria-hidden />
+              ) : isSignedIn ? (
+                <UserButton
+                  appearance={{
+                    elements: { avatarBox: "h-8 w-8 ring-2 ring-nav-border" },
+                  }}
+                />
+              ) : (
+                <SignInButton mode="modal">
+                  <button className="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-accent-ink hover:brightness-[0.96]">
+                    Sign in
+                  </button>
+                </SignInButton>
+              )}
+            </div>
+          </div>
         </div>
         <nav className="flex items-center justify-between gap-1 overflow-x-auto border-t border-nav-border px-3 py-1.5 sm:hidden">
           {LINKS.map((l) => {
