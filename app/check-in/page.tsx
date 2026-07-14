@@ -21,7 +21,6 @@ import type { Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type StepKey =
-  | "name"
   | "university"
   | "region"
   | "intake"
@@ -38,21 +37,12 @@ interface Step {
   leg: 1 | 2 | 3;
   legLabel: string;
   prompt: string;
-  type: "text" | "university" | "choice";
-  placeholder?: string;
+  type: "university" | "choice";
   options?: { value: string; label: string }[];
   visible?: (profile: Profile) => boolean;
 }
 
 const STEPS: Step[] = [
-  {
-    key: "name",
-    leg: 1,
-    legLabel: "YOUR FLIGHT",
-    prompt: "Hi! I'm your Check-In agent. What should I call you?",
-    type: "text",
-    placeholder: "Your name",
-  },
   {
     key: "university",
     leg: 1,
@@ -193,7 +183,7 @@ function visibleSteps(profile: Profile): Step[] {
 }
 
 function firstMissingStep(profile: Profile): StepKey {
-  return visibleSteps(profile).find((step) => !isAnswered(profile, step.key))?.key ?? "name";
+  return visibleSteps(profile).find((step) => !isAnswered(profile, step.key))?.key ?? "university";
 }
 
 function answerLabel(step: Step, value: string): string {
@@ -230,13 +220,12 @@ function insightFor(key: StepKey, profile: Profile): string | null {
 
 export default function CheckIn() {
   const router = useRouter();
-  const { isLoaded: authLoaded, isSignedIn } = useUser();
+  const { isLoaded: authLoaded, isSignedIn, user } = useUser();
   const { profile, setProfile, hydrated, serverSynced } = useApp();
   const [draft, setDraft] = useState<Profile>({});
   const [mode, setMode] = useState<Mode>("loading");
-  const [stepKey, setStepKey] = useState<StepKey>("name");
+  const [stepKey, setStepKey] = useState<StepKey>("university");
   const [history, setHistory] = useState<Turn[]>([]);
-  const [text, setText] = useState("");
 
   useEffect(() => {
     if (
@@ -246,11 +235,13 @@ export default function CheckIn() {
       mode !== "loading"
     ) return;
     const migrated = migrateProfile(profile);
+    const accountName = user?.fullName?.trim() || user?.firstName?.trim();
+    if (isSignedIn && accountName) migrated.name = accountName;
+    else if (!migrated.name) migrated.name = "Traveler";
     setDraft(migrated);
     const requested = new URLSearchParams(window.location.search).get("edit") as StepKey | null;
     if (requested && STEPS.some((candidate) => candidate.key === requested)) {
       setStepKey(requested);
-      setText(requested === "name" ? migrated.name ?? "" : "");
       setMode("edit");
     } else if (profile.completed && hasRequiredCheckInAnswers(migrated)) {
       setMode("review");
@@ -258,7 +249,7 @@ export default function CheckIn() {
       setStepKey(firstMissingStep(migrated));
       setMode("interview");
     }
-  }, [authLoaded, hydrated, isSignedIn, mode, profile, serverSynced]);
+  }, [authLoaded, hydrated, isSignedIn, mode, profile, serverSynced, user?.firstName, user?.fullName]);
 
   const step = STEPS.find((candidate) => candidate.key === stepKey) ?? STEPS[0];
   const activeSteps = useMemo(() => visibleSteps(draft), [draft]);
@@ -292,7 +283,6 @@ export default function CheckIn() {
     }
 
     setDraft(next);
-    setText("");
 
     if (mode === "edit") {
       if (current.key === "university" && !next.city) {
@@ -339,8 +329,32 @@ export default function CheckIn() {
 
   function edit(key: StepKey) {
     setStepKey(key);
-    setText(key === "name" ? draft.name ?? "" : "");
     setMode("edit");
+  }
+
+  function goBack() {
+    const previous = activeSteps[activeIndex - 1];
+    if (!previous) return;
+    setStepKey(previous.key);
+    if (mode === "interview") {
+      const previousIndex = STEPS.findIndex((candidate) => candidate.key === previous.key);
+      setHistory((turns) =>
+        turns.filter(
+          (turn) => STEPS.findIndex((candidate) => candidate.key === turn.key) < previousIndex,
+        ),
+      );
+    }
+  }
+
+  function goNext() {
+    const next = activeSteps[activeIndex + 1];
+    if (mode === "edit") {
+      if (next) setStepKey(next.key);
+      else setMode("review");
+      return;
+    }
+    const existingValue = draft[step.key];
+    if (typeof existingValue === "string") commit(existingValue);
   }
 
   if (
@@ -407,29 +421,6 @@ export default function CheckIn() {
                   initialValue={mode === "edit" ? draft.university : ""}
                   onSelect={commit}
                 />
-              ) : step.type === "text" ? (
-                <form
-                  className="flex gap-2"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    if (text.trim()) commit(text.trim());
-                  }}
-                >
-                  <input
-                    autoFocus
-                    value={text}
-                    onChange={(event) => setText(event.target.value)}
-                    placeholder={step.placeholder}
-                    className="h-11 min-w-0 flex-1 rounded-[9px] border border-field-border bg-field px-3.5 text-[14.5px] text-ink outline-none focus-visible:border-primary"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!text.trim()}
-                    className="h-11 rounded-[9px] bg-primary px-5 text-[14.5px] font-semibold text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
-                  >
-                    Save
-                  </button>
-                </form>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {step.options?.map((option) => (
@@ -443,6 +434,27 @@ export default function CheckIn() {
                   ))}
                 </div>
               )}
+            </div>
+
+            <div className="relative z-30 flex items-center justify-between border-t border-divider bg-card pt-4">
+              <button
+                type="button"
+                onClick={goBack}
+                disabled={activeIndex === 0}
+                className="h-10 rounded-[9px] border border-field-border bg-field px-4 text-[13.5px] font-semibold text-ink transition-colors hover:bg-divider disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                ← Back
+              </button>
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={
+                  mode === "interview" && typeof draft[step.key] !== "string"
+                }
+                className="h-10 rounded-[9px] bg-primary px-4 text-[13.5px] font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                Next →
+              </button>
             </div>
           </div>
 
@@ -501,7 +513,7 @@ function BoardingPass({
       <div className="relative grid gap-5 p-5 sm:grid-cols-3">
         <div className="pointer-events-none absolute bottom-0 left-[33.333%] top-0 hidden border-l border-dashed border-card-border sm:block" />
         <div className="flex flex-col gap-2">
-          <ReviewChip label="NAME" value={profile.name} onClick={() => onEdit("name")} />
+          <ReviewValue label="NAME · FROM PROFILE" value={profile.name || "Traveler"} />
           <ReviewChip label="UNIVERSITY" value={profile.university} onClick={() => onEdit("university")} />
           <ReviewChip
             label="DESTINATION · DERIVED"
@@ -541,6 +553,19 @@ function BoardingPass({
         </button>
       </div>
     </section>
+  );
+}
+
+function ReviewValue({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[9px] border border-card-border bg-[#f6f1e6] px-3 py-2.5 text-left">
+      <span className="block font-mono text-[9px] tracking-[0.13em] text-mono-muted">
+        {label}
+      </span>
+      <span className="mt-0.5 block text-[13.5px] font-semibold text-ink">
+        {value}
+      </span>
+    </div>
   );
 }
 
