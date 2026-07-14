@@ -92,7 +92,6 @@ export function UniversityCombobox({ onSelect, initialValue = "" }: UniversityCo
     <div ref={rootRef} className="relative">
       <div className="relative">
         <input
-          autoFocus
           role="combobox"
           aria-autocomplete="list"
           aria-controls={listId}
@@ -142,7 +141,7 @@ export function UniversityCombobox({ onSelect, initialValue = "" }: UniversityCo
       </div>
 
       {open && (
-        <div className="absolute z-20 mt-1.5 w-full overflow-hidden rounded-[10px] border border-field-border bg-card shadow-[0_18px_34px_-20px_rgba(20,26,38,0.45)]">
+        <div className="relative z-20 mt-1.5 w-full overflow-hidden rounded-[10px] border border-field-border bg-card shadow-[0_18px_34px_-20px_rgba(20,26,38,0.45)]">
           <ul
             id={listId}
             role="listbox"

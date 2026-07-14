@@ -436,7 +436,7 @@ export default function CheckIn() {
               )}
             </div>
 
-            <div className="relative z-30 flex items-center justify-between border-t border-divider bg-card pt-4">
+            <div className="flex items-center justify-between border-t border-divider bg-card pt-4">
               <button
                 type="button"
                 onClick={goBack}
