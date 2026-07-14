@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import { UniversityCombobox } from "@/components/university-combobox";
 import {
   CLIMATE_LABELS,
@@ -229,7 +230,8 @@ function insightFor(key: StepKey, profile: Profile): string | null {
 
 export default function CheckIn() {
   const router = useRouter();
-  const { profile, setProfile, hydrated } = useApp();
+  const { isLoaded: authLoaded, isSignedIn } = useUser();
+  const { profile, setProfile, hydrated, serverSynced } = useApp();
   const [draft, setDraft] = useState<Profile>({});
   const [mode, setMode] = useState<Mode>("loading");
   const [stepKey, setStepKey] = useState<StepKey>("name");
@@ -237,7 +239,12 @@ export default function CheckIn() {
   const [text, setText] = useState("");
 
   useEffect(() => {
-    if (!hydrated || mode !== "loading") return;
+    if (
+      !hydrated ||
+      !authLoaded ||
+      (isSignedIn && !serverSynced) ||
+      mode !== "loading"
+    ) return;
     const migrated = migrateProfile(profile);
     setDraft(migrated);
     if (profile.completed && hasRequiredCheckInAnswers(migrated)) {
@@ -253,7 +260,7 @@ export default function CheckIn() {
       setStepKey(firstMissingStep(migrated));
       setMode("interview");
     }
-  }, [hydrated, mode, profile]);
+  }, [authLoaded, hydrated, isSignedIn, mode, profile, serverSynced]);
 
   const step = STEPS.find((candidate) => candidate.key === stepKey) ?? STEPS[0];
   const activeSteps = useMemo(() => visibleSteps(draft), [draft]);
@@ -338,7 +345,12 @@ export default function CheckIn() {
     setMode("edit");
   }
 
-  if (!hydrated || mode === "loading") {
+  if (
+    !hydrated ||
+    !authLoaded ||
+    (isSignedIn && !serverSynced) ||
+    mode === "loading"
+  ) {
     return <p className="font-mono text-xs text-mono-muted">PREPARING CHECK-IN…</p>;
   }
 
