@@ -86,6 +86,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [serverSynced, setServerSynced] = useState(false);
 
   const hydratedForUser = useRef<string | null>(null);
+  const profileSaveQueue = useRef<Promise<void>>(Promise.resolve());
 
   // 1) initial hydrate from localStorage
   useEffect(() => {
@@ -170,7 +171,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setProfile = useCallback(
     (p: Profile) => {
       setProfileState(p);
-      if (isSignedIn) saveProfile(p).catch((e) => console.error("saveProfile", e));
+      if (isSignedIn) {
+        profileSaveQueue.current = profileSaveQueue.current
+          .catch(() => undefined)
+          .then(() => saveProfile(p))
+          .catch((e) => console.error("saveProfile", e));
+      }
     },
     [isSignedIn],
   );

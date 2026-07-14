@@ -247,15 +247,13 @@ export default function CheckIn() {
     ) return;
     const migrated = migrateProfile(profile);
     setDraft(migrated);
-    if (profile.completed && hasRequiredCheckInAnswers(migrated)) {
-      const requested = new URLSearchParams(window.location.search).get("edit") as StepKey | null;
-      if (requested && STEPS.some((candidate) => candidate.key === requested)) {
-        setStepKey(requested);
-        setText(requested === "name" ? migrated.name ?? "" : "");
-        setMode("edit");
-      } else {
-        setMode("review");
-      }
+    const requested = new URLSearchParams(window.location.search).get("edit") as StepKey | null;
+    if (requested && STEPS.some((candidate) => candidate.key === requested)) {
+      setStepKey(requested);
+      setText(requested === "name" ? migrated.name ?? "" : "");
+      setMode("edit");
+    } else if (profile.completed && hasRequiredCheckInAnswers(migrated)) {
+      setMode("review");
     } else {
       setStepKey(firstMissingStep(migrated));
       setMode("interview");
