@@ -259,10 +259,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
-  }, [profile, list, qty, alloc, hydrated]);
+  }, [profile, list, qty, alloc, activeBags, hydrated]);
 
   const setProfile = useCallback(
     (p: Profile) => {
+      // Reconcile qtys: any list item whose stored qty still equals the *previous*
+      // profile's recommendation gets refreshed to the new profile's recommendation.
+      // User overrides (qty !== recommendedQty(prev)) are preserved untouched.
+      setQtyState((cur) => {
+        const next: Record<string, number> = { ...cur };
+        for (const id of list) {
+          const item = byId.get(id);
+          if (!item) continue;
+          const prevRec = Math.max(1, recommendedQty(item, profile));
+          const nextRec = Math.max(1, recommendedQty(item, p));
+          const stored = cur[id];
+          if (stored === undefined || stored === prevRec) {
+            if (stored !== nextRec) next[id] = nextRec;
+          }
+        }
+        return next;
+      });
       setProfileState(p);
       if (isSignedIn) {
         profileSaveQueue.current = profileSaveQueue.current
@@ -271,7 +288,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           .catch((e) => console.error("saveProfile", e));
       }
     },
-    [isSignedIn],
+    [isSignedIn, list, profile],
   );
 
   const qtyFor = useCallback(

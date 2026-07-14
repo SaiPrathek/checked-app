@@ -65,7 +65,10 @@ export interface PackingItem {
   suggested?: boolean;
   /** Default recommended quantity when no profile override applies. Defaults to 1 if omitted. */
   baseQty?: number;
-  /** Profile-dependent quantity overrides. */
+  /**
+   * Profile-dependent quantity overrides (legacy, first-match-wins).
+   * Kept for backward compat; new items should prefer `deltaBy`.
+   */
   qtyBy?: {
     climate?: Partial<Record<NonNullable<Profile["climate"]>, number>>;
     intake?: Partial<Record<NonNullable<Profile["intake"]>, number>>;
@@ -76,6 +79,41 @@ export interface PackingItem {
     cooking?: Partial<Record<NonNullable<Profile["cooking"]>, number>>;
     beverage?: Partial<Record<NonNullable<Profile["beverage"]>, number>>;
     gender?: Partial<Record<NonNullable<Profile["gender"]>, number>>;
+  };
+  /**
+   * Additive quantity deltas — every matching dimension contributes.
+   * recommendedQty = clamp(baseQty + Σ deltaBy[dim][profile[dim]], minQty ?? 0, maxQty ?? 999).
+   * Use negative deltas to subtract (e.g. warm climate → −4 sweaters).
+   */
+  deltaBy?: {
+    climate?: Partial<Record<NonNullable<Profile["climate"]>, number>>;
+    intake?: Partial<Record<NonNullable<Profile["intake"]>, number>>;
+    housing?: Partial<Record<NonNullable<Profile["housing"]>, number>>;
+    roommates?: Partial<Record<NonNullable<Profile["roommates"]>, number>>;
+    dietPractice?: Partial<Record<NonNullable<Profile["dietPractice"]>, number>>;
+    cuisine?: Partial<Record<NonNullable<Profile["cuisine"]>, number>>;
+    cooking?: Partial<Record<NonNullable<Profile["cooking"]>, number>>;
+    beverage?: Partial<Record<NonNullable<Profile["beverage"]>, number>>;
+    gender?: Partial<Record<NonNullable<Profile["gender"]>, number>>;
+  };
+  /** Clamp bounds for the additive model; defaults 0 and 999. */
+  minQty?: number;
+  maxQty?: number;
+  /**
+   * Profile-driven verdict shifts (first-match-wins in the same dimension order).
+   * Overrides the Hold's default verdict when a dimension matches — e.g. a
+   * heavy coat is "bring-from-india" for cold+spring but "skip" for warm.
+   */
+  verdictBy?: {
+    climate?: Partial<Record<NonNullable<Profile["climate"]>, Verdict>>;
+    intake?: Partial<Record<NonNullable<Profile["intake"]>, Verdict>>;
+    housing?: Partial<Record<NonNullable<Profile["housing"]>, Verdict>>;
+    roommates?: Partial<Record<NonNullable<Profile["roommates"]>, Verdict>>;
+    dietPractice?: Partial<Record<NonNullable<Profile["dietPractice"]>, Verdict>>;
+    cuisine?: Partial<Record<NonNullable<Profile["cuisine"]>, Verdict>>;
+    cooking?: Partial<Record<NonNullable<Profile["cooking"]>, Verdict>>;
+    beverage?: Partial<Record<NonNullable<Profile["beverage"]>, Verdict>>;
+    gender?: Partial<Record<NonNullable<Profile["gender"]>, Verdict>>;
   };
   /** Do not show items irrelevant to this profile in the main Manifest. */
   visibleIf?: (profile: Profile) => boolean;

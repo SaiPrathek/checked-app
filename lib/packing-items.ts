@@ -52,23 +52,40 @@ export const PACKING_ITEMS: PackingItem[] = [
   {
     id: "transit-jacket", name: "Light / transit jacket", holdKey: "winter jacket",
     category: "clothing", weightKg: 0.8, suggested: true, baseQty: 1, volumeL: 3,
-    qtyBy: { climate: { warm: 0, cold: 1, mixed: 1 } },
+    deltaBy: { climate: { warm: -1, cold: 0, mixed: 0 } },
+    minQty: 0, maxQty: 1,
+    verdictBy: { climate: { warm: "skip" } },
     transport: { cabin: "prefer", note: "or just wear it on the plane" },
   },
   {
     id: "thermals", name: "Thermal base layers", holdKey: "winter jacket",
-    category: "clothing", weightKg: 0.2, suggested: true, baseQty: 3, volumeL: 0.4,
-    qtyBy: { climate: { warm: 0, cold: 5, mixed: 2 } },
+    category: "clothing", weightKg: 0.2, suggested: true, baseQty: 2, volumeL: 0.4,
+    deltaBy: {
+      climate: { warm: -2, cold: 3, mixed: 0 },
+      intake: { spring: 1 },
+    },
+    minQty: 0, maxQty: 6,
+    verdictBy: { climate: { warm: "skip" } },
   },
   {
     id: "heavy-coat", name: "Heavy winter down coat", holdKey: "winter jacket",
     category: "clothing", weightKg: 1.8, baseQty: 1, volumeL: 8,
     visibleIf: (p) => p.climate === "cold" && p.intake === "spring",
+    verdictBy: {
+      climate: { warm: "skip" },
+      intake: { fall: "buy-in-us" },
+    },
     transport: { cabin: "prefer", note: "wear or carry it — you land into winter" },
   },
   {
     id: "everyday-clothes", name: "Everyday clothes (per set)", holdKey: "branded clothing",
-    category: "clothing", weightKg: 0.4, suggested: true, baseQty: 14, volumeL: 2.5,
+    category: "clothing", weightKg: 0.4, suggested: true, baseQty: 10, volumeL: 2.5,
+    deltaBy: {
+      climate: { cold: 2, warm: -1 },
+      housing: { apartment: 2 },
+      roommates: { alone: 1 },
+    },
+    minQty: 7, maxQty: 18,
     cabinSeed: 2,
   },
   { id: "shoes", name: "Pairs of shoes", holdKey: "branded clothing", category: "clothing", weightKg: 0.9, suggested: true, baseQty: 2, volumeL: 4 },
@@ -85,7 +102,12 @@ export const PACKING_ITEMS: PackingItem[] = [
   {
     id: "cooker", name: "Pressure cooker (3 L)", holdKey: "pressure cooker",
     category: "kitchen", weightKg: 2.2, baseQty: 0, volumeL: 6,
-    qtyBy: { housing: { dorm: 0, apartment: 1 }, cooking: { rarely: 0, daily: 1, weekly: 1 } },
+    deltaBy: {
+      housing: { apartment: 1 },
+      cooking: { daily: 1, weekly: 1, rarely: -1 },
+    },
+    minQty: 0, maxQty: 1,
+    verdictBy: { housing: { dorm: "skip" }, cooking: { rarely: "skip" } },
     visibleIf: (p) => p.cooking !== "rarely",
     shareable: true,
     transport: { cabin: "never", note: "pressure cookers get pulled at security; checked only" },
@@ -93,15 +115,19 @@ export const PACKING_ITEMS: PackingItem[] = [
   {
     id: "tava", name: "Flat tava / griddle", holdKey: "kitchenware",
     category: "kitchen", weightKg: 1.1, baseQty: 0, volumeL: 2,
-    qtyBy: { housing: { dorm: 0, apartment: 1 } },
+    deltaBy: { housing: { apartment: 1 }, cooking: { daily: 1 } },
+    minQty: 0, maxQty: 1,
+    verdictBy: { housing: { dorm: "skip" } },
     visibleIf: (p) => p.cooking !== "rarely",
     shareable: true,
     transport: { cabin: "never", note: "heavy metal cookware isn't cabin-friendly" },
   },
   {
     id: "kitchen-basics", name: "Light kitchen basics (knife, strainer, masala box)", holdKey: "kitchenware",
-    category: "kitchen", weightKg: 1.0, suggested: true, baseQty: 1, volumeL: 3,
-    qtyBy: { housing: { dorm: 0, apartment: 1 } },
+    category: "kitchen", weightKg: 1.0, suggested: true, baseQty: 0, volumeL: 3,
+    deltaBy: { housing: { apartment: 1 }, cooking: { daily: 1, weekly: 1 } },
+    minQty: 0, maxQty: 1,
+    verdictBy: { housing: { dorm: "skip" } },
     visibleIf: (p) => p.cooking !== "rarely",
     shareable: true,
     transport: { cabin: "never", note: "knives and sharp tools are banned from the cabin" },
@@ -123,8 +149,12 @@ export const PACKING_ITEMS: PackingItem[] = [
   // food
   {
     id: "spices", name: "Dry spices & masalas (bags)", holdKey: "spices",
-    category: "food", weightKg: 0.3, suggested: true, baseQty: 5, volumeL: 0.5,
-    qtyBy: { cooking: { rarely: 2, daily: 8, weekly: 5 } },
+    category: "food", weightKg: 0.3, suggested: true, baseQty: 4, volumeL: 0.5,
+    deltaBy: {
+      cooking: { rarely: -2, daily: 4, weekly: 1 },
+      housing: { apartment: 1 },
+    },
+    minQty: 2, maxQty: 12,
     visibleIf: (p) => !p.cuisine,
     transport: { cabin: "never", note: "powders over 350 ml face extra screening in the cabin" },
   },
@@ -169,7 +199,12 @@ export const PACKING_ITEMS: PackingItem[] = [
   {
     id: "rice-dal", name: "Rice & lentils (bridge supply, kg)", holdKey: "rice and lentils",
     category: "food", weightKg: 1.0, baseQty: 0, volumeL: 1.2,
-    qtyBy: { cooking: { rarely: 0, daily: 3, weekly: 0 } },
+    deltaBy: {
+      cooking: { daily: 3, weekly: 1 },
+      housing: { apartment: 1 },
+    },
+    minQty: 0, maxQty: 5,
+    verdictBy: { cooking: { rarely: "skip" }, housing: { dorm: "buy-in-us" } },
   },
 
   // electronics

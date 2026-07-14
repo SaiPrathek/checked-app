@@ -2,74 +2,136 @@ import type { HoldItem, PackingItem, Profile, Verdict } from "./types";
 
 export interface ResolvedGuidance {
   verdict: Verdict;
-  /** profile-specific notes pulled from The Hold's context map */
+  /** true when the verdict was shifted from the Hold default by the user's profile */
+  shifted: boolean;
+  /** profile-specific notes pulled from The Hold's context map, plus verdict-shift note */
   personalNotes: string[];
 }
 
-/**
- * Resolves a canonical Hold verdict against the user's Check-In profile.
- * v0 keeps the base verdict and surfaces the matching context note(s) as
- * "For you" guidance — it never fabricates a verdict the corpus doesn't hold.
- * Aggregation that shifts verdicts by community Debrief data comes later.
- */
-export function resolveGuidance(hold: HoldItem, profile: Profile): ResolvedGuidance {
-  const personalNotes: string[] = [];
-  const ctx = hold.context ?? {};
+/** One profile dimension that changed the recommended quantity, with its delta or absolute value. */
+export interface QtyDriver {
+  dimension: keyof NonNullable<PackingItem["deltaBy"]>;
+  value: string; // the specific profile value, e.g. "cold" or "apartment"
+  delta: number; // positive or negative; for qtyBy (absolute) this is the resolved-vs-base delta
+  absolute?: boolean; // true when the driver came from qtyBy (override), not deltaBy (additive)
+}
 
-  if (profile.climate && ctx.climate?.[profile.climate]) {
-    personalNotes.push(ctx.climate[profile.climate]);
-  }
-  if (profile.intake && ctx.intake?.[profile.intake]) {
-    personalNotes.push(ctx.intake[profile.intake]);
-  }
-  if (profile.housing && ctx.housing?.[profile.housing]) {
-    personalNotes.push(ctx.housing[profile.housing]);
-  }
-  if (profile.roommates && ctx.roommates?.[profile.roommates])
-    personalNotes.push(ctx.roommates[profile.roommates]);
-  if (profile.dietPractice && ctx.dietPractice?.[profile.dietPractice])
-    personalNotes.push(ctx.dietPractice[profile.dietPractice]);
-  if (profile.cuisine && ctx.cuisine?.[profile.cuisine])
-    personalNotes.push(ctx.cuisine[profile.cuisine]);
-  if (profile.cooking && ctx.cooking?.[profile.cooking])
-    personalNotes.push(ctx.cooking[profile.cooking]);
-  if (profile.beverage && ctx.beverage?.[profile.beverage])
-    personalNotes.push(ctx.beverage[profile.beverage]);
-  if (profile.gender && ctx.gender?.[profile.gender])
-    personalNotes.push(ctx.gender[profile.gender]);
+/** Dimension precedence — first-match-wins for verdict shifts and legacy qtyBy. */
+const DIM_ORDER = [
+  "climate",
+  "intake",
+  "housing",
+  "roommates",
+  "dietPractice",
+  "cuisine",
+  "cooking",
+  "beverage",
+  "gender",
+] as const;
 
-  return { verdict: hold.verdict, personalNotes };
+function profileValue(profile: Profile, dim: (typeof DIM_ORDER)[number]): string | undefined {
+  return profile[dim] ?? undefined;
 }
 
 /**
- * Recommended quantity for a packing item given the user's profile.
- * Precedence: climate → intake → housing → roommates → diet practice → cuisine
- * → cooking → beverage → gender → baseQty → 1.
- * The user's UI value in the store overrides this whenever set.
+ * Resolves a Hold verdict against the user's Check-In profile.
+ * Applies `verdictBy` shifts first (first matching dimension wins), then falls
+ * back to the Hold's default. Also collects `context` notes as personal notes.
+ */
+export function resolveGuidance(
+  hold: HoldItem,
+  profile: Profile,
+  item?: PackingItem,
+): ResolvedGuidance {
+  const personalNotes: string[] = [];
+  const ctx = hold.context ?? {};
+  let verdict: Verdict = hold.verdict;
+  let shifted = false;
+
+  const shiftMap = item?.verdictBy;
+  if (shiftMap) {
+    for (const dim of DIM_ORDER) {
+      const v = profileValue(profile, dim);
+      if (!v) continue;
+      const shifted_v = (shiftMap[dim] as Record<string, Verdict> | undefined)?.[v];
+      if (shifted_v !== undefined && shifted_v !== hold.verdict) {
+        verdict = shifted_v;
+        shifted = true;
+        break;
+      }
+    }
+  }
+
+  for (const dim of DIM_ORDER) {
+    const v = profileValue(profile, dim);
+    if (!v) continue;
+    const note = (ctx[dim] as Record<string, string> | undefined)?.[v];
+    if (note) personalNotes.push(note);
+  }
+
+  return { verdict, shifted, personalNotes };
+}
+
+/**
+ * Recommended quantity — multi-factor additive model.
+ *   qty = clamp(baseQty + Σ deltaBy[dim][profile[dim]], minQty, maxQty)
+ * `qtyBy` (legacy, first-match-wins) still overrides the base if present.
+ * User overrides in the store always win over this.
  */
 export function recommendedQty(item: PackingItem, profile: Profile): number {
+  const drivers = qtyDrivers(item, profile);
+  const base = item.baseQty ?? 1;
+
+  // legacy qtyBy override (first match wins)
   const q = item.qtyBy;
   if (q) {
-    if (profile.climate && q.climate?.[profile.climate] !== undefined)
-      return q.climate[profile.climate]!;
-    if (profile.intake && q.intake?.[profile.intake] !== undefined)
-      return q.intake[profile.intake]!;
-    if (profile.housing && q.housing?.[profile.housing] !== undefined)
-      return q.housing[profile.housing]!;
-    if (profile.roommates && q.roommates?.[profile.roommates] !== undefined)
-      return q.roommates[profile.roommates]!;
-    if (profile.dietPractice && q.dietPractice?.[profile.dietPractice] !== undefined)
-      return q.dietPractice[profile.dietPractice]!;
-    if (profile.cuisine && q.cuisine?.[profile.cuisine] !== undefined)
-      return q.cuisine[profile.cuisine]!;
-    if (profile.cooking && q.cooking?.[profile.cooking] !== undefined)
-      return q.cooking[profile.cooking]!;
-    if (profile.beverage && q.beverage?.[profile.beverage] !== undefined)
-      return q.beverage[profile.beverage]!;
-    if (profile.gender && q.gender?.[profile.gender] !== undefined)
-      return q.gender[profile.gender]!;
+    for (const dim of DIM_ORDER) {
+      const v = profileValue(profile, dim);
+      if (!v) continue;
+      const abs = (q[dim] as Record<string, number> | undefined)?.[v];
+      if (abs !== undefined) return abs;
+    }
   }
-  return item.baseQty ?? 1;
+
+  const delta = drivers.reduce((s, d) => s + d.delta, 0);
+  const min = item.minQty ?? 0;
+  const max = item.maxQty ?? 999;
+  return Math.max(min, Math.min(max, base + delta));
+}
+
+/**
+ * Return the profile-driven contributions to recommendedQty, in dimension order.
+ * Empty when no `deltaBy` entries match — the item is at its baseQty.
+ */
+export function qtyDrivers(item: PackingItem, profile: Profile): QtyDriver[] {
+  const out: QtyDriver[] = [];
+  const d = item.deltaBy;
+  if (!d) return out;
+  for (const dim of DIM_ORDER) {
+    const v = profileValue(profile, dim);
+    if (!v) continue;
+    const delta = (d[dim] as Record<string, number> | undefined)?.[v];
+    if (delta !== undefined && delta !== 0) {
+      out.push({ dimension: dim, value: v, delta });
+    }
+  }
+  return out;
+}
+
+/** Human-readable label for a driver dimension. */
+export function driverLabel(driver: QtyDriver): string {
+  const map: Record<QtyDriver["dimension"], (v: string) => string> = {
+    climate: (v) => `${v} climate`,
+    intake: (v) => `${v} intake`,
+    housing: (v) => (v === "apartment" ? "apartment" : "dorm"),
+    roommates: (v) => (v === "roommates" ? "with roommates" : "living alone"),
+    dietPractice: (v) => v,
+    cuisine: (v) => `${v} Indian cuisine`,
+    cooking: (v) => `cooks ${v}`,
+    beverage: (v) => (v === "both" ? "coffee & chai" : v),
+    gender: (v) => v,
+  };
+  return map[driver.dimension](driver.value);
 }
 
 export function isItemVisible(item: PackingItem, profile: Profile): boolean {

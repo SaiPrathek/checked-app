@@ -6,7 +6,7 @@ import { useUser } from "@clerk/nextjs";
 import { useApp } from "@/lib/store";
 import { PACKING_ITEMS } from "@/lib/packing-items";
 import { getHoldItem } from "@/lib/hold";
-import { isItemVisible, itemName, recommendedQty, resolveGuidance } from "@/lib/guidance";
+import { driverLabel, isItemVisible, itemName, qtyDrivers, recommendedQty, resolveGuidance } from "@/lib/guidance";
 import { CLIMATE_LABELS } from "@/lib/climate";
 import { PROFILE_LABELS } from "@/lib/profile";
 import type { Category, PackingItem, Profile } from "@/lib/types";
@@ -217,9 +217,8 @@ export default function Manifest() {
         >
           {availableCategories.map((category) => {
             const selected = category === activeCategory;
-            const count = visibleItems.filter(
-              (item) => item.category === category,
-            ).length;
+            // Count matches the "N recommended" shown in the panel — items surfaced by default.
+            const count = (grouped.get(category) ?? []).length;
             return (
               <button
                 key={category}
@@ -360,9 +359,11 @@ function ManifestRow({
 }) {
   const hold = getHoldItem(item.holdKey);
   if (!hold) return null;
-  const guidance = resolveGuidance(hold, profile);
+  const guidance = resolveGuidance(hold, profile, item);
   const displayName = itemName(item, profile);
   const coordinate = item.shareable && profile.roommates === "roommates";
+  const drivers = qtyDrivers(item, profile);
+  const recommended = recommendedQty(item, profile);
 
   return (
     <div className={first ? "p-4" : "border-t border-divider p-4"}>
@@ -399,6 +400,26 @@ function ManifestRow({
           {open && (
             <div className="mt-2.5 flex flex-col gap-2 border-l-2 border-[#eadfcb] pl-3">
               <p className="m-0 text-[13.5px] leading-[1.55] text-ink-muted">{hold.detail}</p>
+              {drivers.length > 0 && (
+                <p className="m-0 text-[13px] leading-[1.5] text-ink">
+                  <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-mono-muted">RECOMMENDED {recommended}</span>
+                  <span className="mx-1.5 text-mono-muted">·</span>
+                  {drivers.map((d, i) => (
+                    <span key={`${d.dimension}-${d.value}`}>
+                      {i > 0 && <span className="mx-1 text-mono-muted">·</span>}
+                      <span className="text-ink-muted">{driverLabel(d)}</span>{" "}
+                      <span className={d.delta > 0 ? "font-mono font-bold text-good" : "font-mono font-bold text-over"}>
+                        {d.delta > 0 ? "+" : ""}{d.delta}
+                      </span>
+                    </span>
+                  ))}
+                </p>
+              )}
+              {guidance.shifted && (
+                <p className="m-0 text-[13px] leading-[1.5] text-ink">
+                  <span className="font-bold text-primary">Verdict shifted for your profile</span> — the corpus default was <em>{hold.verdict}</em>.
+                </p>
+              )}
               {guidance.personalNotes.map((note, index) => (
                 <p key={index} className="m-0 text-[13.5px] leading-[1.5] text-ink">
                   <span className="font-bold text-primary">For you:</span> {note}
