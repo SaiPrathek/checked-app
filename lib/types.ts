@@ -39,17 +39,32 @@ export interface HoldItem {
   communityStats?: unknown;
 }
 
-/** A concrete, packable line-item shown in The Manifest and weighed in Weigh-In. */
+/**
+ * A concrete, packable line-item shown in The Manifest and weighed in Weigh-In.
+ * `baseQty` is the default recommended count if no profile dimension applies.
+ * `qtyBy` lets the recommended count vary by profile dimension — the *first*
+ * profile match (climate → intake → housing → diet) wins, so define values
+ * from most-specific to least. The user can always override in the UI.
+ */
 export interface PackingItem {
   id: string;
   name: string;
   /** links to HoldItem.item for verdict, reasoning, context and citations */
   holdKey: string;
   category: Category;
-  /** rough weight estimate (kg) for the Weigh-In simulator */
+  /** rough per-unit weight (kg); Weigh-In multiplies by the user's chosen qty */
   weightKg: number;
   /** suggested-on-list by default (true for bring/either essentials) */
   suggested?: boolean;
+  /** Default recommended quantity when no profile override applies. Defaults to 1 if omitted. */
+  baseQty?: number;
+  /** Profile-dependent quantity overrides. */
+  qtyBy?: {
+    climate?: Partial<Record<NonNullable<Profile["climate"]>, number>>;
+    intake?: Partial<Record<NonNullable<Profile["intake"]>, number>>;
+    housing?: Partial<Record<NonNullable<Profile["housing"]>, number>>;
+    diet?: Partial<Record<NonNullable<Profile["diet"]>, number>>;
+  };
 }
 
 export interface Profile {

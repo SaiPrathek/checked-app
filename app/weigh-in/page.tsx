@@ -9,30 +9,46 @@ import { Meter } from "@/components/ui/meter";
 
 const byId = new Map(PACKING_ITEMS.map((i) => [i.id, i]));
 
-export default function WeighIn() {
-  const { list, bags, assignBag, hydrated } = useApp();
+/** A listed item paired with the user's chosen qty — the actual weighing unit. */
+interface Line {
+  item: PackingItem;
+  qty: number;
+  /** total weight for the line = item.weightKg * qty */
+  kg: number;
+}
 
-  const listedItems = useMemo(
-    () => list.map((id) => byId.get(id)).filter((x): x is PackingItem => !!x),
-    [list],
+export default function WeighIn() {
+  const { list, bags, assignBag, qtyFor, hydrated } = useApp();
+
+  const lines = useMemo<Line[]>(
+    () =>
+      list
+        .map((id) => {
+          const item = byId.get(id);
+          if (!item) return null;
+          const qty = qtyFor(id);
+          return { item, qty, kg: item.weightKg * qty };
+        })
+        .filter((x): x is Line => !!x),
+    [list, qtyFor],
   );
 
   const columns = useMemo(() => {
-    const unassigned = listedItems.filter((it) => !bags[it.id]);
-    const perBag: Record<BagId, PackingItem[]> = { bag1: [], bag2: [], cabin: [] };
-    for (const it of listedItems) {
-      const b = bags[it.id];
-      if (b) perBag[b].push(it);
+    const unassigned = lines.filter((l) => !bags[l.item.id]);
+    const perBag: Record<BagId, Line[]> = { bag1: [], bag2: [], cabin: [] };
+    for (const l of lines) {
+      const b = bags[l.item.id];
+      if (b) perBag[b].push(l);
     }
     return { unassigned, perBag };
-  }, [listedItems, bags]);
+  }, [lines, bags]);
 
-  const totalKg = listedItems.reduce((s, it) => s + it.weightKg, 0);
+  const totalKg = lines.reduce((s, l) => s + l.kg, 0);
 
   if (!hydrated)
     return <p className="font-mono text-xs text-mono-muted">LOADING…</p>;
 
-  if (listedItems.length === 0) {
+  if (lines.length === 0) {
     return (
       <div className="mx-auto max-w-md py-16 text-center">
         <div className="mb-2 font-mono text-[11px] tracking-[0.2em] text-mono-muted">
@@ -89,21 +105,21 @@ export default function WeighIn() {
       <div className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-3.5">
         <Column
           title="Unpacked"
-          items={columns.unassigned}
+          lines={columns.unassigned}
           onDrop={(e) => onDrop(e, undefined)}
           onAssign={assignBag}
           currentBag=""
         />
         {BAGS.map((bag) => {
           const items = columns.perBag[bag.id];
-          const kg = items.reduce((s, it) => s + it.weightKg, 0);
+          const kg = items.reduce((s, l) => s + l.kg, 0);
           return (
             <Column
               key={bag.id}
               title={bag.label}
               limitKg={bag.limitKg}
               kg={kg}
-              items={items}
+              lines={items}
               onDrop={(e) => onDrop(e, bag.id)}
               onAssign={assignBag}
               currentBag={bag.id}
@@ -117,7 +133,7 @@ export default function WeighIn() {
 
 function Column({
   title,
-  items,
+  lines,
   kg,
   limitKg,
   onDrop,
@@ -125,7 +141,7 @@ function Column({
   currentBag,
 }: {
   title: string;
-  items: PackingItem[];
+  lines: Line[];
   kg?: number;
   limitKg?: number;
   onDrop: (e: React.DragEvent) => void;
@@ -162,28 +178,28 @@ function Column({
       </div>
 
       <div className="flex flex-1 flex-col gap-2">
-        {items.map((it) => (
+        {lines.map((l) => (
           <div
-            key={it.id}
+            key={l.item.id}
             draggable
-            onDragStart={(e) => e.dataTransfer.setData("text/plain", it.id)}
+            onDragStart={(e) => e.dataTransfer.setData("text/plain", l.item.id)}
             className="cursor-grab rounded-[9px] border border-card-border bg-card p-2.5 shadow-[0_1px_0_rgba(0,0,0,0.03)] active:cursor-grabbing"
           >
             <div className="flex items-center justify-between gap-2">
               <span className="min-w-0 truncate text-[13px] font-medium">
-                {it.name}
+                {l.item.name}
               </span>
-              <span className="flex-shrink-0 font-mono text-[11px] text-mono-muted">
-                {it.weightKg.toFixed(1)}
+              <span className="flex-shrink-0 whitespace-nowrap font-mono text-[11px] text-mono-muted">
+                ×{l.qty} · {l.kg.toFixed(1)}
               </span>
             </div>
             <select
               value={currentBag}
               onChange={(e) =>
-                onAssign(it.id, (e.target.value || undefined) as BagId | undefined)
+                onAssign(l.item.id, (e.target.value || undefined) as BagId | undefined)
               }
               className="mt-[7px] w-full cursor-pointer appearance-none rounded-[6px] border border-card-border bg-field px-2 py-1 font-mono text-[10.5px] tracking-[0.04em] text-ink-muted"
-              aria-label={`Move ${it.name}`}
+              aria-label={`Move ${l.item.name}`}
             >
               <option value="">◦ Unpacked</option>
               <option value="bag1">→ Checked Bag 1</option>
@@ -192,7 +208,7 @@ function Column({
             </select>
           </div>
         ))}
-        {items.length === 0 && (
+        {lines.length === 0 && (
           <div className="grid min-h-[60px] flex-1 place-items-center rounded-[9px] border border-dashed border-[#d8cebb] font-mono text-[11px] tracking-[0.1em] text-[#a79e8b]">
             DROP ITEMS HERE
           </div>

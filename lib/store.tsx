@@ -11,11 +11,14 @@ import {
 } from "react";
 import { useUser } from "@clerk/nextjs";
 import type { BagId, Profile } from "./types";
+import { PACKING_ITEMS } from "./packing-items";
+import { recommendedQty } from "./guidance";
 import { getMyProfile, saveProfile } from "./actions/profile";
 import {
   getMyList,
   toggleListItem as serverToggle,
   assignBag as serverAssign,
+  setQty as serverSetQty,
   importList,
 } from "./actions/list";
 
@@ -23,6 +26,8 @@ interface AppState {
   profile: Profile;
   /** ids of PackingItems the user has added to their Manifest */
   list: string[];
+  /** per-item quantity; falls back to recommendedQty() when absent */
+  qty: Record<string, number>;
   /** which bag each listed item is assigned to in Weigh-In */
   bags: Record<string, BagId | undefined>;
   hydrated: boolean;
@@ -32,6 +37,8 @@ interface AppState {
   setProfile: (p: Profile) => void;
   toggleListItem: (id: string) => void;
   isListed: (id: string) => boolean;
+  setQtyForItem: (id: string, qty: number) => void;
+  qtyFor: (id: string) => number;
   assignBag: (id: string, bag: BagId | undefined) => void;
   reset: () => void;
 }
@@ -42,36 +49,41 @@ const AppContext = createContext<AppState | null>(null);
 interface Persisted {
   profile: Profile;
   list: string[];
+  qty: Record<string, number>;
   bags: Record<string, BagId | undefined>;
 }
 
 function loadLocal(): Persisted {
-  if (typeof window === "undefined") return { profile: {}, list: [], bags: {} };
+  if (typeof window === "undefined") return { profile: {}, list: [], qty: {}, bags: {} };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw) return { profile: {}, list: [], bags: {}, ...JSON.parse(raw) };
+    if (raw) return { profile: {}, list: [], qty: {}, bags: {}, ...JSON.parse(raw) };
   } catch {
     /* ignore */
   }
-  return { profile: {}, list: [], bags: {} };
+  return { profile: {}, list: [], qty: {}, bags: {} };
 }
+
+/** Lookup by id — cheap enough that we don't need to memoize. */
+const byId = new Map(PACKING_ITEMS.map((i) => [i.id, i]));
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn, user } = useUser();
   const [profile, setProfileState] = useState<Profile>({});
   const [list, setList] = useState<string[]>([]);
+  const [qty, setQtyState] = useState<Record<string, number>>({});
   const [bags, setBags] = useState<Record<string, BagId | undefined>>({});
   const [hydrated, setHydrated] = useState(false);
   const [serverSynced, setServerSynced] = useState(false);
 
-  // Guard: run the server-hydration once per signed-in user so re-renders don't re-fetch.
   const hydratedForUser = useRef<string | null>(null);
 
-  // 1) initial hydrate from localStorage (works for signed-out AND is the offline fallback)
+  // 1) initial hydrate from localStorage
   useEffect(() => {
     const p = loadLocal();
     setProfileState(p.profile);
     setList(p.list);
+    setQtyState(p.qty ?? {});
     setBags(p.bags);
     setHydrated(true);
   }, []);
@@ -99,24 +111,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
         Object.keys(local.profile ?? {}).length > 0 || local.list.length > 0;
 
       if (serverIsEmpty && localHasSomething) {
-        // Migrate anonymous localStorage state to the server on first sign-in
         if (Object.keys(local.profile).length > 0) {
           await saveProfile(local.profile);
           setProfileState(local.profile);
         }
         if (local.list.length > 0) {
           await importList(
-            local.list.map((id) => ({ itemId: id, bag: local.bags[id] ?? null })),
+            local.list.map((id) => ({
+              itemId: id,
+              qty: local.qty?.[id] ?? 1,
+              bag: local.bags[id] ?? null,
+            })),
           );
           setList(local.list);
+          setQtyState(local.qty ?? {});
           setBags(local.bags);
         }
       } else {
         if (serverProfile) setProfileState(serverProfile);
         if (serverList.length) {
           setList(serverList.map((r) => r.itemId));
+          const q: Record<string, number> = {};
           const b: Record<string, BagId | undefined> = {};
-          for (const r of serverList) if (r.bag) b[r.itemId] = r.bag;
+          for (const r of serverList) {
+            q[r.itemId] = r.qty;
+            if (r.bag) b[r.itemId] = r.bag;
+          }
+          setQtyState(q);
           setBags(b);
         }
       }
@@ -124,18 +145,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })().catch((e) => console.error("[Checked] server sync failed", e));
   }, [hydrated, isLoaded, isSignedIn, user]);
 
-  // 3) persist to localStorage whenever state changes (used as offline cache too)
+  // 3) persist to localStorage
   useEffect(() => {
     if (!hydrated) return;
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ profile, list, bags }),
+        JSON.stringify({ profile, list, qty, bags }),
       );
     } catch {
       /* ignore */
     }
-  }, [profile, list, bags, hydrated]);
+  }, [profile, list, qty, bags, hydrated]);
 
   const setProfile = useCallback(
     (p: Profile) => {
@@ -145,10 +166,54 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [isSignedIn],
   );
 
+  const qtyFor = useCallback(
+    (id: string) => {
+      if (qty[id] !== undefined) return qty[id];
+      const item = byId.get(id);
+      return item ? recommendedQty(item, profile) : 1;
+    },
+    [qty, profile],
+  );
+
   const toggleListItem = useCallback(
     (id: string) => {
-      setList((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
-      if (isSignedIn) serverToggle(id).catch((e) => console.error("toggleListItem", e));
+      const inList = list.includes(id);
+      if (inList) {
+        setList((cur) => cur.filter((x) => x !== id));
+        setQtyState((cur) => {
+          const next = { ...cur };
+          delete next[id];
+          return next;
+        });
+      } else {
+        const item = byId.get(id);
+        const initial = item ? Math.max(1, recommendedQty(item, profile)) : 1;
+        setList((cur) => [...cur, id]);
+        setQtyState((cur) => ({ ...cur, [id]: initial }));
+        if (isSignedIn)
+          serverToggle(id, initial).catch((e) => console.error("toggle", e));
+        return;
+      }
+      if (isSignedIn) serverToggle(id).catch((e) => console.error("toggle", e));
+    },
+    [isSignedIn, list, profile],
+  );
+
+  const setQtyForItem = useCallback(
+    (id: string, next: number) => {
+      const clean = Math.max(0, Math.floor(next));
+      if (clean === 0) {
+        setList((cur) => cur.filter((x) => x !== id));
+        setQtyState((cur) => {
+          const nx = { ...cur };
+          delete nx[id];
+          return nx;
+        });
+      } else {
+        setList((cur) => (cur.includes(id) ? cur : [...cur, id]));
+        setQtyState((cur) => ({ ...cur, [id]: clean }));
+      }
+      if (isSignedIn) serverSetQty(id, clean).catch((e) => console.error("setQty", e));
     },
     [isSignedIn],
   );
@@ -167,16 +232,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value: AppState = {
     profile,
     list,
+    qty,
     bags,
     hydrated,
     serverSynced,
     setProfile,
     toggleListItem,
     isListed: (id) => list.includes(id),
+    setQtyForItem,
+    qtyFor,
     assignBag,
     reset: () => {
       setProfileState({});
       setList([]);
+      setQtyState({});
       setBags({});
     },
   };

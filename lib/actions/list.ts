@@ -9,6 +9,7 @@ import type { BagId } from "@/lib/types";
 
 export interface ListRow {
   itemId: string;
+  qty: number;
   bag: BagId | null;
 }
 
@@ -16,14 +17,24 @@ export async function getMyList(): Promise<ListRow[]> {
   const { userId } = await auth();
   if (!userId) return [];
   const rows = await db
-    .select({ itemId: listItems.itemId, bag: listItems.bag })
+    .select({ itemId: listItems.itemId, qty: listItems.qty, bag: listItems.bag })
     .from(listItems)
     .where(eq(listItems.userId, userId));
-  return rows.map((r) => ({ itemId: r.itemId, bag: (r.bag ?? null) as BagId | null }));
+  return rows.map((r) => ({
+    itemId: r.itemId,
+    qty: r.qty,
+    bag: (r.bag ?? null) as BagId | null,
+  }));
 }
 
-/** Add the item to the user's list if absent, remove it if present. */
-export async function toggleListItem(itemId: string): Promise<{ added: boolean }> {
+/**
+ * Add the item to the user's list if absent, remove it if present.
+ * When adding, initialQty seeds the qty column (from recommendedQty()); default 1.
+ */
+export async function toggleListItem(
+  itemId: string,
+  initialQty = 1,
+): Promise<{ added: boolean }> {
   const userId = await ensureUser();
   if (!userId) throw new Error("Not signed in");
   const existing = await db
@@ -36,14 +47,38 @@ export async function toggleListItem(itemId: string): Promise<{ added: boolean }
       .where(and(eq(listItems.userId, userId), eq(listItems.itemId, itemId)));
     return { added: false };
   }
-  await db.insert(listItems).values({ userId, itemId, bag: null });
+  await db.insert(listItems).values({
+    userId,
+    itemId,
+    qty: Math.max(1, Math.floor(initialQty)),
+    bag: null,
+  });
   return { added: true };
+}
+
+export async function setQty(itemId: string, qty: number): Promise<void> {
+  const userId = await ensureUser();
+  if (!userId) throw new Error("Not signed in");
+  const clean = Math.max(0, Math.floor(qty));
+  if (clean === 0) {
+    // qty=0 means "not on my list" — delete the row so the checkbox reads unchecked
+    await db
+      .delete(listItems)
+      .where(and(eq(listItems.userId, userId), eq(listItems.itemId, itemId)));
+    return;
+  }
+  await db
+    .insert(listItems)
+    .values({ userId, itemId, qty: clean, bag: null })
+    .onConflictDoUpdate({
+      target: [listItems.userId, listItems.itemId],
+      set: { qty: sql`excluded.qty` },
+    });
 }
 
 export async function assignBag(itemId: string, bag: BagId | null): Promise<void> {
   const userId = await ensureUser();
   if (!userId) throw new Error("Not signed in");
-  // upsert — if not in list yet, add it into the target bag
   await db
     .insert(listItems)
     .values({ userId, itemId, bag })
@@ -55,13 +90,20 @@ export async function assignBag(itemId: string, bag: BagId | null): Promise<void
 
 /** Bulk-import a local list on first sign-in — used to migrate anonymous localStorage state. */
 export async function importList(
-  entries: { itemId: string; bag: BagId | null }[],
+  entries: { itemId: string; qty: number; bag: BagId | null }[],
 ): Promise<void> {
   const userId = await ensureUser();
   if (!userId) throw new Error("Not signed in");
   if (entries.length === 0) return;
   await db
     .insert(listItems)
-    .values(entries.map((e) => ({ userId, itemId: e.itemId, bag: e.bag })))
+    .values(
+      entries.map((e) => ({
+        userId,
+        itemId: e.itemId,
+        qty: Math.max(1, Math.floor(e.qty)),
+        bag: e.bag,
+      })),
+    )
     .onConflictDoNothing();
 }

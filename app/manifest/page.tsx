@@ -10,6 +10,7 @@ import { resolveGuidance } from "@/lib/guidance";
 import type { Category, PackingItem } from "@/lib/types";
 import { VerdictBadge } from "@/components/ui/verdict-badge";
 import { CommunityStat } from "@/components/ui/community-stat";
+import { QtyStepper } from "@/components/ui/qty-stepper";
 import { getCommunityStats } from "@/lib/actions/debrief";
 import type { Stat } from "@/lib/debrief";
 
@@ -38,7 +39,15 @@ const CATEGORY_LABEL: Record<Category, string> = {
 };
 
 export default function Manifest() {
-  const { profile, list, toggleListItem, isListed, hydrated } = useApp();
+  const {
+    profile,
+    list,
+    toggleListItem,
+    isListed,
+    hydrated,
+    qtyFor,
+    setQtyForItem,
+  } = useApp();
   const { isSignedIn } = useUser();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [stats, setStats] = useState<Map<string, Stat>>(new Map());
@@ -93,12 +102,30 @@ export default function Manifest() {
             )}
           </p>
         </div>
-        <div className="text-right">
-          <div className="font-mono text-[22px] font-bold text-ink">
-            {list.length}
+        <div className="flex items-end gap-6 text-right">
+          <div>
+            <div className="font-mono text-[22px] font-bold text-ink">
+              {list.reduce((s, id) => s + qtyFor(id), 0)}
+            </div>
+            <div className="font-mono text-[10px] tracking-[0.16em] text-mono-muted">
+              UNITS
+            </div>
           </div>
-          <div className="font-mono text-[10px] tracking-[0.16em] text-mono-muted">
-            ITEMS ON LIST
+          <div>
+            <div className="font-mono text-[22px] font-bold text-ink">
+              {list
+                .reduce((s, id) => {
+                  const it = PACKING_ITEMS.find((p) => p.id === id);
+                  return s + (it ? it.weightKg * qtyFor(id) : 0);
+                }, 0)
+                .toFixed(1)}
+              <span className="ml-0.5 text-[13px] font-medium text-mono-muted">
+                kg
+              </span>
+            </div>
+            <div className="font-mono text-[10px] tracking-[0.16em] text-mono-muted">
+              PACKED WEIGHT
+            </div>
           </div>
         </div>
       </div>
@@ -156,11 +183,26 @@ export default function Manifest() {
                           </span>
                           <span className="font-mono text-[11px] text-mono-muted">
                             {it.weightKg.toFixed(1)} kg
+                            {isListed(it.id) && qtyFor(it.id) > 1 && (
+                              <> · {(it.weightKg * qtyFor(it.id)).toFixed(1)} total</>
+                            )}
                           </span>
                         </div>
+                        {isListed(it.id) && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <QtyStepper
+                              value={qtyFor(it.id)}
+                              onChange={(n) => setQtyForItem(it.id, n)}
+                              label={`Quantity of ${it.name}`}
+                            />
+                            <span className="font-mono text-[10.5px] uppercase tracking-[0.1em] text-mono-muted">
+                              QTY
+                            </span>
+                          </div>
+                        )}
                         <button
                           onClick={() => setExpanded(open ? null : it.id)}
-                          className="mt-[3px] text-[12.5px] text-mono-muted underline underline-offset-2"
+                          className="mt-[6px] text-[12.5px] text-mono-muted underline underline-offset-2"
                         >
                           {open ? "Hide why" : "Why?"}
                         </button>

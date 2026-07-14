@@ -5,6 +5,7 @@ import {
   timestamp,
   jsonb,
   numeric,
+  integer,
   primaryKey,
 } from "drizzle-orm/pg-core";
 
@@ -48,6 +49,8 @@ export const listItems = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     itemId: text("item_id").notNull(),
+    /** How many of this item the user plans to pack; drives weight × qty. */
+    qty: integer("qty").notNull().default(1),
     bag: text("bag"),
     addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
   },

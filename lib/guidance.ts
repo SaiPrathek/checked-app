@@ -1,4 +1,4 @@
-import type { HoldItem, Profile, Verdict } from "./types";
+import type { HoldItem, PackingItem, Profile, Verdict } from "./types";
 
 export interface ResolvedGuidance {
   verdict: Verdict;
@@ -30,6 +30,26 @@ export function resolveGuidance(hold: HoldItem, profile: Profile): ResolvedGuida
   }
 
   return { verdict: hold.verdict, personalNotes };
+}
+
+/**
+ * Recommended quantity for a packing item given the user's profile.
+ * Precedence: climate → intake → housing → diet → baseQty → 1.
+ * The user's UI value in the store overrides this whenever set.
+ */
+export function recommendedQty(item: PackingItem, profile: Profile): number {
+  const q = item.qtyBy;
+  if (q) {
+    if (profile.climate && q.climate?.[profile.climate] !== undefined)
+      return q.climate[profile.climate]!;
+    if (profile.intake && q.intake?.[profile.intake] !== undefined)
+      return q.intake[profile.intake]!;
+    if (profile.housing && q.housing?.[profile.housing] !== undefined)
+      return q.housing[profile.housing]!;
+    if (profile.diet && q.diet?.[profile.diet] !== undefined)
+      return q.diet[profile.diet]!;
+  }
+  return item.baseQty ?? 1;
 }
 
 /** Naive local retrieval over The Hold for The Tower (routed-RAG placeholder). */
