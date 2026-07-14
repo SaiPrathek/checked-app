@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useApp } from "@/lib/store";
 import { PACKING_ITEMS } from "@/lib/packing-items";
@@ -17,8 +17,11 @@ interface Line {
   kg: number;
 }
 
+type BagView = "unassigned" | BagId;
+
 export default function WeighIn() {
   const { list, bags, assignBag, qtyFor, hydrated } = useApp();
+  const [activeView, setActiveView] = useState<BagView>("unassigned");
 
   const lines = useMemo<Line[]>(
     () =>
@@ -44,6 +47,12 @@ export default function WeighIn() {
   }, [lines, bags]);
 
   const totalKg = lines.reduce((s, l) => s + l.kg, 0);
+  const unpackedKg = columns.unassigned.reduce((sum, line) => sum + line.kg, 0);
+  const activeBag = BAGS.find((bag) => bag.id === activeView);
+  const activeLines = activeView === "unassigned"
+    ? columns.unassigned
+    : columns.perBag[activeView];
+  const activeKg = activeLines.reduce((sum, line) => sum + line.kg, 0);
 
   if (!hydrated)
     return <p className="font-mono text-xs text-mono-muted">LOADING…</p>;
@@ -74,7 +83,10 @@ export default function WeighIn() {
   function onDrop(e: React.DragEvent, bag: BagId | undefined) {
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain");
-    if (id) assignBag(id, bag);
+    if (id) {
+      assignBag(id, bag);
+      setActiveView(bag ?? "unassigned");
+    }
   }
 
   return (
@@ -97,42 +109,154 @@ export default function WeighIn() {
             {totalKg.toFixed(1)} kg
           </div>
           <div className="font-mono text-[10px] tracking-[0.16em] text-mono-muted">
-            {columns.unassigned.length} UNPACKED
+            TOTAL PLANNED · {columns.unassigned.length} UNPACKED
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-3.5">
-        <Column
-          title="Unpacked"
-          lines={columns.unassigned}
-          onDrop={(e) => onDrop(e, undefined)}
-          onAssign={assignBag}
-          currentBag=""
-        />
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-card-border bg-[#f6f1e6] px-4 py-3">
+        <span className="font-mono text-[10.5px] font-bold tracking-[0.16em] text-mono-muted">
+          BAGGAGE ALLOWANCE
+        </span>
+        <div className="flex flex-wrap gap-x-5 gap-y-1 font-mono text-[11px] text-ink-muted">
+          <span>2 × 23 KG CHECKED</span>
+          <span>7 KG CABIN</span>
+          <span>53 KG TOTAL</span>
+        </div>
+      </div>
+
+      <div
+        role="tablist"
+        aria-label="Baggage compartments"
+        className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-3"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeView === "unassigned"}
+          aria-controls="bag-workspace"
+          onClick={() => setActiveView("unassigned")}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => onDrop(event, undefined)}
+          className={activeView === "unassigned"
+            ? "rounded-[14px] border border-nav bg-nav p-4 text-left text-nav-text shadow-[0_14px_28px_-22px_rgba(6,12,24,0.8)]"
+            : "rounded-[14px] border border-card-border bg-card p-4 text-left transition-colors hover:border-primary"}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <span className={activeView === "unassigned"
+                ? "block font-mono text-[9.5px] tracking-[0.14em] text-nav-muted"
+                : "block font-mono text-[9.5px] tracking-[0.14em] text-mono-muted"}
+              >
+                STAGING AREA
+              </span>
+              <span className="mt-1 block font-display text-[17px] font-bold">Unpacked</span>
+            </div>
+            <span className={activeView === "unassigned"
+              ? "rounded-full bg-[#ffffff14] px-2.5 py-1 font-mono text-[11px]"
+              : "rounded-full bg-panel px-2.5 py-1 font-mono text-[11px] text-ink-muted"}
+            >
+              {columns.unassigned.length}
+            </span>
+          </div>
+          <div className={activeView === "unassigned"
+            ? "mt-4 font-mono text-[20px] font-bold text-accent"
+            : "mt-4 font-mono text-[20px] font-bold text-ink"}
+          >
+            {unpackedKg.toFixed(1)} kg
+          </div>
+          <div className={activeView === "unassigned"
+            ? "mt-1 text-[11.5px] text-nav-muted"
+            : "mt-1 text-[11.5px] text-ink-muted"}
+          >
+            Assign these items to a bag
+          </div>
+        </button>
+
         {BAGS.map((bag) => {
           const items = columns.perBag[bag.id];
           const kg = items.reduce((s, l) => s + l.kg, 0);
+          const over = kg > bag.limitKg;
+          const remaining = Math.abs(bag.limitKg - kg);
+          const selected = activeView === bag.id;
           return (
-            <Column
+            <button
               key={bag.id}
-              title={bag.label}
-              limitKg={bag.limitKg}
-              kg={kg}
-              lines={items}
-              onDrop={(e) => onDrop(e, bag.id)}
-              onAssign={assignBag}
-              currentBag={bag.id}
-            />
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-controls="bag-workspace"
+              onClick={() => setActiveView(bag.id)}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => onDrop(event, bag.id)}
+              className={selected
+                ? "rounded-[14px] border border-nav bg-nav p-4 text-left text-nav-text shadow-[0_14px_28px_-22px_rgba(6,12,24,0.8)]"
+                : "rounded-[14px] border border-card-border bg-card p-4 text-left transition-colors hover:border-primary"}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <span className={selected
+                    ? "block font-mono text-[9.5px] tracking-[0.14em] text-nav-muted"
+                    : "block font-mono text-[9.5px] tracking-[0.14em] text-mono-muted"}
+                  >
+                    {bag.id === "cabin" ? "CARRY-ON" : "CHECKED"}
+                  </span>
+                  <span className="mt-1 block font-display text-[17px] font-bold">{bag.label}</span>
+                </div>
+                <span className={selected
+                  ? "rounded-full bg-[#ffffff14] px-2.5 py-1 font-mono text-[11px]"
+                  : "rounded-full bg-panel px-2.5 py-1 font-mono text-[11px] text-ink-muted"}
+                >
+                  {items.length}
+                </span>
+              </div>
+              <div className="mt-4 flex items-baseline justify-between gap-2">
+                <span className={over
+                  ? "font-mono text-[20px] font-bold text-over"
+                  : selected
+                    ? "font-mono text-[20px] font-bold text-accent"
+                    : "font-mono text-[20px] font-bold text-ink"}
+                >
+                  {kg.toFixed(1)} kg
+                </span>
+                <span className={selected
+                  ? "font-mono text-[10.5px] text-nav-muted"
+                  : "font-mono text-[10.5px] text-mono-muted"}
+                >
+                  / {bag.limitKg} kg
+                </span>
+              </div>
+              <Meter value={kg} limit={bag.limitKg} className="mt-2" />
+              <div className={over
+                ? "mt-2 text-[11.5px] font-semibold text-over"
+                : selected
+                  ? "mt-2 text-[11.5px] text-nav-muted"
+                  : "mt-2 text-[11.5px] text-ink-muted"}
+              >
+                {over ? `${remaining.toFixed(1)} kg over limit` : `${remaining.toFixed(1)} kg remaining`}
+              </div>
+            </button>
           );
         })}
       </div>
+
+      <BagWorkspace
+        title={activeBag?.label ?? "Unpacked"}
+        eyebrow={activeBag ? `${activeBag.limitKg} KG LIMIT` : "STAGING AREA"}
+        lines={activeLines}
+        kg={activeKg}
+        limitKg={activeBag?.limitKg}
+        onDrop={(event) => onDrop(event, activeBag?.id)}
+        onAssign={assignBag}
+        currentBag={activeBag?.id ?? ""}
+      />
     </div>
   );
 }
 
-function Column({
+function BagWorkspace({
   title,
+  eyebrow,
   lines,
   kg,
   limitKg,
@@ -141,64 +265,66 @@ function Column({
   currentBag,
 }: {
   title: string;
+  eyebrow: string;
   lines: Line[];
-  kg?: number;
+  kg: number;
   limitKg?: number;
   onDrop: (e: React.DragEvent) => void;
   onAssign: (id: string, bag: BagId | undefined) => void;
   currentBag: BagId | "";
 }) {
-  const showMeter = limitKg !== undefined;
-  const limit = limitKg ?? 0;
-  const packed = kg ?? 0;
-  const over = showMeter && packed > limit;
-  const near = showMeter && !over && packed > limit * 0.9;
-  const numColor = over ? "text-over" : near ? "text-[#9a5b00]" : "text-mono-muted";
+  const over = limitKg !== undefined && kg > limitKg;
   return (
     <div
+      id="bag-workspace"
+      role="tabpanel"
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
-      className="flex min-h-[220px] flex-col gap-2.5 rounded-[14px] border border-card-border bg-panel p-3.5"
+      className="overflow-hidden rounded-[14px] border border-card-border bg-card shadow-[0_12px_26px_-24px_rgba(20,26,38,0.5)]"
     >
-      <div className="flex flex-col gap-2">
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="font-display text-[15px] font-bold">{title}</span>
-          {showMeter && (
-            <span className={`font-mono text-[12px] ${numColor}`}>
-              {packed.toFixed(1)}/{limit}
-            </span>
-          )}
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-card-border bg-[#f6f1e6] px-4 py-3.5">
+        <div>
+          <span className="block font-mono text-[9.5px] font-bold tracking-[0.16em] text-mono-muted">
+            {eyebrow}
+          </span>
+          <h2 className="mt-1 font-display text-[20px] font-bold">{title}</h2>
         </div>
-        {showMeter && <Meter value={packed} limit={limit} />}
-        {over && (
-          <p className="m-0 text-[12px] font-semibold text-over">
-            Over by {(packed - limit).toFixed(1)} kg — offload something.
-          </p>
-        )}
+        <div className="text-right">
+          <span className={over
+            ? "block font-mono text-[18px] font-bold text-over"
+            : "block font-mono text-[18px] font-bold text-ink"}
+          >
+            {kg.toFixed(1)} kg
+          </span>
+          <span className="font-mono text-[9.5px] tracking-[0.12em] text-mono-muted">
+            {lines.length} ITEM{lines.length === 1 ? "" : "S"}
+          </span>
+        </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-2">
+      <div>
         {lines.map((l) => (
           <div
             key={l.item.id}
             draggable
             onDragStart={(e) => e.dataTransfer.setData("text/plain", l.item.id)}
-            className="cursor-grab rounded-[9px] border border-card-border bg-card p-2.5 shadow-[0_1px_0_rgba(0,0,0,0.03)] active:cursor-grabbing"
+            className="grid cursor-grab gap-3 border-t border-divider p-4 first:border-t-0 active:cursor-grabbing sm:grid-cols-[minmax(0,1fr)_auto_190px] sm:items-center"
           >
-            <div className="flex items-center justify-between gap-2">
-              <span className="min-w-0 truncate text-[13px] font-medium">
-                {l.item.name}
-              </span>
-              <span className="flex-shrink-0 whitespace-nowrap font-mono text-[11px] text-mono-muted">
-                ×{l.qty} · {l.kg.toFixed(1)}
+            <div className="min-w-0">
+              <span className="block truncate text-[14px] font-semibold">{l.item.name}</span>
+              <span className="mt-0.5 block font-mono text-[10px] tracking-[0.08em] text-mono-muted">
+                DRAG TO A BAG ABOVE
               </span>
             </div>
+            <span className="whitespace-nowrap font-mono text-[12px] text-ink-muted">
+              ×{l.qty} · {l.kg.toFixed(1)} kg
+            </span>
             <select
               value={currentBag}
               onChange={(e) =>
                 onAssign(l.item.id, (e.target.value || undefined) as BagId | undefined)
               }
-              className="mt-[7px] w-full cursor-pointer appearance-none rounded-[6px] border border-card-border bg-field px-2 py-1 font-mono text-[10.5px] tracking-[0.04em] text-ink-muted"
+              className="h-9 w-full cursor-pointer appearance-none rounded-[7px] border border-field-border bg-field px-2.5 font-mono text-[10.5px] tracking-[0.04em] text-ink-muted"
               aria-label={`Move ${l.item.name}`}
             >
               <option value="">◦ Unpacked</option>
@@ -209,8 +335,15 @@ function Column({
           </div>
         ))}
         {lines.length === 0 && (
-          <div className="grid min-h-[60px] flex-1 place-items-center rounded-[9px] border border-dashed border-[#d8cebb] font-mono text-[11px] tracking-[0.1em] text-[#a79e8b]">
-            DROP ITEMS HERE
+          <div className="grid min-h-[150px] place-items-center p-5 text-center">
+            <div>
+              <div className="font-mono text-[11px] font-bold tracking-[0.14em] text-[#a79e8b]">
+                DROP ITEMS HERE
+              </div>
+              <p className="mb-0 mt-2 text-[13px] text-ink-muted">
+                This compartment is empty.
+              </p>
+            </div>
           </div>
         )}
       </div>
