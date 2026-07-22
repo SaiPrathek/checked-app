@@ -203,7 +203,7 @@ export interface CustomItem {
   transport?: { cabin: "must" | "never" | "prefer"; note?: string };
   verdict?: Verdict; // AI or user-declared; no Hold entry
   note?: string; // AI-generated rationale or user note
-  aiFilled?: boolean; // true when Claude classified this item
+  aiFilled?: boolean; // true when Checked AI classified this item
   createdAt?: string;
 }
 

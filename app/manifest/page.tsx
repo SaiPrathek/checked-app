@@ -733,7 +733,7 @@ function AddCustomForm({
   const [aiFilled, setAiFilled] = useState(false);
   const [classifying, setClassifying] = useState(false);
 
-  async function askClaude() {
+  async function askCheckedAI() {
     if (!name.trim()) return;
     setClassifying(true);
     try {
@@ -776,18 +776,18 @@ function AddCustomForm({
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") askClaude(); }}
+            onKeyDown={(e) => { if (e.key === "Enter") askCheckedAI(); }}
             placeholder="e.g. Yoga mat"
             className="h-10 rounded-[9px] border border-field-border bg-card px-3 text-[14px] text-ink"
           />
         </label>
         <button
           type="button"
-          onClick={askClaude}
+          onClick={askCheckedAI}
           disabled={!name.trim() || classifying}
           className="h-10 rounded-[9px] border border-primary bg-card px-3.5 text-[13px] font-semibold text-primary transition-colors hover:bg-[#eef2fb] disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {classifying ? "Asking Claude…" : "✦ Ask Claude to fill this in"}
+          {classifying ? "Asking Checked AI…" : "✦ Ask Checked AI to fill this in"}
         </button>
       </div>
 
