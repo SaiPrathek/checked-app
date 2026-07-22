@@ -19,6 +19,54 @@ import { CommunityStat } from "@/components/ui/community-stat";
 import { QtyStepper } from "@/components/ui/qty-stepper";
 import { getCommunityStats } from "@/lib/actions/debrief";
 import type { Stat } from "@/lib/debrief";
+import { Tour, type TourStep } from "@/components/tour/tour";
+import { TourButton } from "@/components/tour/tour-button";
+import { useTourController } from "@/lib/tour";
+
+const STEPS_MANIFEST: TourStep[] = [
+  {
+    anchor: "manifest-totals",
+    title: "Your running totals",
+    body: "Units and packed weight update live as you add items and change quantities — your at-a-glance bag budget.",
+    placement: "bottom",
+  },
+  {
+    anchor: "manifest-tabs",
+    title: "Browse by category",
+    body: "Documents, clothing, kitchen, medicines and more. Each tab shows how many items are recommended for your profile.",
+    placement: "bottom",
+  },
+  {
+    anchor: "manifest-view-toggle",
+    title: "Cards or Checklist",
+    body: "Cards are the packable items that flow into Weigh-In. Switch to Checklist for the full gather-and-prep list (visas, transcripts, receipts) you just tick off.",
+    placement: "bottom",
+  },
+  {
+    anchor: "manifest-add-item",
+    title: "Add your own item",
+    body: "Missing something? Add it and let Checked AI fill in the category, weight and a bring-or-buy verdict for you — all editable.",
+    placement: "bottom",
+  },
+  {
+    anchor: "manifest-select-all",
+    title: "Select all at once",
+    body: "Add or clear every item in this category in one tap, then fine-tune from there.",
+    placement: "bottom",
+  },
+  {
+    anchor: "manifest-card",
+    title: "Each item, explained",
+    body: "Tick to add it, use the stepper to set how many, and open “Why?” to see the bring-from-India / buy-in-US reasoning tuned to you.",
+    placement: "bottom",
+  },
+  {
+    anchor: "manifest-weigh-cta",
+    title: "On to Weigh-In",
+    body: "When your list looks right, head to Weigh-In to pack everything into bags and stay under the airline limits.",
+    placement: "top",
+  },
+];
 
 const CATEGORY_OPTIONS: Category[] = [
   "documents", "medicines", "clothing", "bedding", "kitchen",
@@ -92,6 +140,7 @@ export default function Manifest() {
   const [stats, setStats] = useState<Map<string, Stat>>(new Map());
   const [view, setView] = useState<"cards" | "checklist">("cards");
   const [adding, setAdding] = useState(false);
+  const tour = useTourController("manifest", { canAutoStart: hydrated });
 
   const visibleItems = useMemo(
     () => PACKING_ITEMS.filter((item) => isItemVisible(item, profile)),
@@ -169,8 +218,11 @@ export default function Manifest() {
     <div className="flex flex-col gap-[22px]">
       <div className="flex flex-wrap items-end justify-between gap-3.5">
         <div>
-          <div className="mb-2 font-mono text-[11px] tracking-[0.2em] text-mono-muted">
-            GATE B4 · CK 02
+          <div className="mb-2 flex items-center gap-2.5">
+            <span className="font-mono text-[11px] tracking-[0.2em] text-mono-muted">
+              GATE B4 · CK 02
+            </span>
+            <TourButton onClick={tour.start} />
           </div>
           <h1 className="m-0 font-display text-[34px] font-bold tracking-[-0.02em]">
             The Manifest
@@ -195,7 +247,7 @@ export default function Manifest() {
             )}
           </p>
         </div>
-        <div className="flex items-end gap-6 text-right">
+        <div className="flex items-end gap-6 text-right" data-tour="manifest-totals">
           <div>
             <div className="font-mono text-[22px] font-bold text-ink">
               {list.reduce((s, id) => s + qtyFor(id), 0)}
@@ -275,6 +327,7 @@ export default function Manifest() {
         <div
           role="tablist"
           aria-label="Manifest categories"
+          data-tour="manifest-tabs"
           className="flex overflow-x-auto border-b border-card-border bg-[#f6f1e6] p-1.5"
         >
           {availableCategories.map((category) => {
@@ -324,7 +377,7 @@ export default function Manifest() {
                 {CATEGORY_LABEL[activeCategory]}
               </h2>
               {/* Cards | Checklist view toggle */}
-              <div className="flex items-center gap-1 rounded-full border border-field-border bg-[#f6f1e6] p-0.5">
+              <div className="flex items-center gap-1 rounded-full border border-field-border bg-[#f6f1e6] p-0.5" data-tour="manifest-view-toggle">
                 <ManifestViewButton active={view === "cards"} onClick={() => setView("cards")}>Cards</ManifestViewButton>
                 <ManifestViewButton
                   active={view === "checklist"}
@@ -342,6 +395,7 @@ export default function Manifest() {
                 </span>
                 <button
                   type="button"
+                  data-tour="manifest-add-item"
                   onClick={() => setAdding((v) => !v)}
                   className="rounded-full border border-field-border bg-card px-2.5 py-1 font-mono text-[10.5px] font-bold uppercase tracking-[0.12em] text-ink-muted transition-colors hover:border-primary hover:text-primary"
                 >
@@ -353,6 +407,7 @@ export default function Manifest() {
                   return (
                     <button
                       type="button"
+                      data-tour="manifest-select-all"
                       onClick={() => {
                         const targets = allSelected ? activeItems.filter((it) => isListed(it.id)) : unlisted;
                         targets.forEach((it) => toggleListItem(it.id));
@@ -442,7 +497,7 @@ export default function Manifest() {
         </div>
       </section>
 
-      <div className="sticky bottom-4 mx-auto flex w-full max-w-[440px] items-center justify-between gap-3 rounded-full border border-[#22344f] bg-nav py-2.5 pl-5 pr-3 shadow-[0_18px_34px_-20px_rgba(6,12,24,0.7)]">
+      <div data-tour="manifest-weigh-cta" className="sticky bottom-4 mx-auto flex w-full max-w-[440px] items-center justify-between gap-3 rounded-full border border-[#22344f] bg-nav py-2.5 pl-5 pr-3 shadow-[0_18px_34px_-20px_rgba(6,12,24,0.7)]">
         <span className="text-[14px] text-[#e7edf7]">
           {list.length} item{list.length === 1 ? "" : "s"} ready to weigh
         </span>
@@ -457,6 +512,8 @@ export default function Manifest() {
           Weigh-In →
         </Link>
       </div>
+
+      <Tour steps={STEPS_MANIFEST} open={tour.open} onClose={tour.close} />
     </div>
   );
 }
@@ -503,7 +560,10 @@ function ManifestRow({
   const recommended = recommendedQty(item, profile);
 
   return (
-    <div className={first ? "p-4" : "border-t border-divider p-4"}>
+    <div
+      className={first ? "p-4" : "border-t border-divider p-4"}
+      data-tour={first ? "manifest-card" : undefined}
+    >
       <div className="flex items-start gap-3">
         <input
           type="checkbox"

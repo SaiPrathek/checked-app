@@ -18,6 +18,48 @@ import {
 } from "@/lib/loadsheet";
 import { Meter } from "@/components/ui/meter";
 import { ItemIcon } from "@/components/item-icon";
+import { Tour, type TourStep } from "@/components/tour/tour";
+import { TourButton } from "@/components/tour/tour-button";
+import { useTourController } from "@/lib/tour";
+
+const STEPS_WEIGHIN: TourStep[] = [
+  {
+    anchor: "weighin-autopack",
+    title: "Auto-Pack for you",
+    body: "One tap builds an optimal, rule-aware loadsheet — spreading weight across your bags and keeping cabin-only items (laptop, meds, documents) where they belong.",
+    placement: "bottom",
+  },
+  {
+    anchor: "weighin-fleet",
+    title: "Your bag fleet",
+    body: "This is what you're flying with. Remove a bag with ✕ or add the cabin/backpack — every weight limit and the packing plan adjust automatically.",
+    placement: "bottom",
+  },
+  {
+    anchor: "weighin-view-toggle",
+    title: "Two ways to pack",
+    body: "Suitcase is the visual, tap-to-pack view. Classic list is a drag-and-drop columns view. Use whichever you prefer — the totals are the same.",
+    placement: "bottom",
+  },
+  {
+    anchor: "weighin-bag-tabs",
+    title: "Switch between bags",
+    body: "Each tab shows a bag and its live weight against the limit — it turns red the moment you go over.",
+    placement: "bottom",
+  },
+  {
+    anchor: "weighin-tray",
+    title: "The tray → the case",
+    body: "Unpacked items wait in the tray. Tap one to drop it into the open bag; tap it inside the case to send it back.",
+    placement: "right",
+  },
+  {
+    anchor: "weighin-meters",
+    title: "Weight & space, live",
+    body: "Pick a case size and watch both meters. Stay in the green and you're under the airline limit with room to spare.",
+    placement: "top",
+  },
+];
 
 /** Units of one item inside one bag (or the tray). */
 interface BagLine {
@@ -79,6 +121,7 @@ export default function WeighIn() {
   const [activeBagTab, setActiveBagTab] = useState<BagId>("bag1");
   const [bagConfig, setBagConfig] = useState<Record<BagId, BagConfig>>(DEFAULT_CONFIG);
   const [notes, setNotes] = useState<LoadsheetNote[] | null>(null);
+  const tour = useTourController("weighin", { canAutoStart: hydrated && list.length > 0 });
 
   const items = useMemo(
     () =>
@@ -223,8 +266,11 @@ export default function WeighIn() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3.5">
         <div>
-          <div className="mb-2 font-mono text-[11px] tracking-[0.2em] text-mono-muted">
-            GATE C2 · CK 03 · BAGGAGE LAB
+          <div className="mb-2 flex items-center gap-2.5">
+            <span className="font-mono text-[11px] tracking-[0.2em] text-mono-muted">
+              GATE C2 · CK 03 · BAGGAGE LAB
+            </span>
+            <TourButton onClick={tour.start} />
           </div>
           <h1 className="m-0 font-display text-[34px] font-bold tracking-[-0.02em]">Weigh-In</h1>
           <p className="mt-1.5 max-w-[520px] text-[14.5px] text-ink-muted">
@@ -234,6 +280,7 @@ export default function WeighIn() {
         <div className="flex items-center gap-4">
           <button
             type="button"
+            data-tour="weighin-autopack"
             onClick={runAutoPack}
             className="flex h-11 items-center gap-2 rounded-[9px] bg-accent px-5 text-[14.5px] font-semibold text-accent-ink hover:brightness-[0.96]"
           >
@@ -247,7 +294,7 @@ export default function WeighIn() {
       </div>
 
       {/* fleet manager */}
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-card-border bg-card px-4 py-3">
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-card-border bg-card px-4 py-3" data-tour="weighin-fleet">
         <span className="mr-1 font-mono text-[10px] tracking-[0.16em] text-mono-muted">FLEET</span>
         {activeBags.map((id) => {
           const bag = bagDef(id);
@@ -323,7 +370,7 @@ export default function WeighIn() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2.5">
+      <div className="flex flex-wrap items-center gap-2.5" data-tour="weighin-view-toggle">
         <span className="mr-1 font-mono text-[10px] tracking-[0.16em] text-mono-muted">VIEW</span>
         <ViewButton active={view === "case"} onClick={() => setView("case")}>Suitcase</ViewButton>
         <ViewButton active={view === "classic"} onClick={() => setView("classic")}>Classic list</ViewButton>
@@ -331,7 +378,7 @@ export default function WeighIn() {
 
       {view === "case" ? (
         <div className="flex flex-col gap-5">
-          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Bags">
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Bags" data-tour="weighin-bag-tabs">
             {activeBags.map((id) => {
               const bag = bagDef(id);
               const bagKg = (perBag[id] ?? []).reduce((sum, line) => sum + line.kg, 0);
@@ -363,7 +410,7 @@ export default function WeighIn() {
           </div>
 
           <div className="grid items-stretch gap-[18px] lg:grid-cols-[minmax(280px,1fr)_minmax(360px,1.5fr)]">
-            <section className="flex min-w-0 flex-col gap-3 rounded-2xl border border-card-border bg-panel p-5">
+            <section className="flex min-w-0 flex-col gap-3 rounded-2xl border border-card-border bg-panel p-5" data-tour="weighin-tray">
               <div className="flex items-baseline justify-between gap-3">
                 <h2 className="m-0 font-display text-[16px] font-bold">Tray</h2>
                 <span className="font-mono text-[10px] tracking-[0.14em] text-mono-muted">
@@ -489,7 +536,7 @@ export default function WeighIn() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3" data-tour="weighin-meters">
                 <Metric label="WEIGHT" value={kg} limit={def.limitKg} unit="kg" />
                 <Metric label="SPACE" value={packedVolume} limit={capacity} unit="L" round />
               </div>
@@ -535,6 +582,8 @@ export default function WeighIn() {
           })}
         </div>
       )}
+
+      <Tour steps={STEPS_WEIGHIN} open={tour.open} onClose={tour.close} />
     </div>
   );
 }

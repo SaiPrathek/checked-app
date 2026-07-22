@@ -17,6 +17,36 @@ import {
 } from "@/lib/profile";
 import { useApp } from "@/lib/store";
 import type { Profile } from "@/lib/types";
+import { Tour, type TourStep } from "@/components/tour/tour";
+import { TourButton } from "@/components/tour/tour-button";
+import { useTourController } from "@/lib/tour";
+
+const STEPS_CHECKIN: TourStep[] = [
+  {
+    anchor: "checkin-leg",
+    title: "Four quick legs",
+    body: "Your check-in is grouped into legs — your flight, your setup, your kitchen and your background. This bar tells you where you are.",
+    placement: "bottom",
+  },
+  {
+    anchor: "checkin-options",
+    title: "Just tap an answer",
+    body: "Pick the option that fits. Each answer sharpens what The Manifest recommends — counts, verdicts and what to skip.",
+    placement: "top",
+  },
+  {
+    anchor: "checkin-nav",
+    title: "Back and forth anytime",
+    body: "Move between questions freely — nothing is locked in, and you can re-answer anything later from the boarding pass.",
+    placement: "top",
+  },
+  {
+    anchor: "checkin-progress",
+    title: "Under 90 seconds",
+    body: "This bar fills as you go. At the end you'll get a boarding pass to review before your Manifest is built.",
+    placement: "top",
+  },
+];
 
 type StepKey =
   | "university"
@@ -223,6 +253,9 @@ export default function CheckIn() {
   const [mode, setMode] = useState<Mode>("loading");
   const [stepKey, setStepKey] = useState<StepKey>("university");
   const [resetPending, setResetPending] = useState(false);
+  const tour = useTourController("checkin", {
+    canAutoStart: hydrated && mode === "interview",
+  });
 
   useEffect(() => {
     if (
@@ -363,8 +396,11 @@ export default function CheckIn() {
     <div className="mx-auto flex max-w-[760px] flex-col gap-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="mb-2 font-mono text-[11px] tracking-[0.2em] text-mono-muted">
-            GATE A1 · CK 01
+          <div className="mb-2 flex items-center gap-2.5">
+            <span className="font-mono text-[11px] tracking-[0.2em] text-mono-muted">
+              GATE A1 · CK 01
+            </span>
+            {mode !== "review" && <TourButton onClick={tour.start} />}
           </div>
           <h1 className="m-0 font-display text-[34px] font-bold tracking-[-0.02em]">
             Check-In
@@ -417,7 +453,7 @@ export default function CheckIn() {
         />
       ) : (
         <>
-          <div className="flex items-center justify-between rounded-[10px] border border-card-border bg-[#f6f1e6] px-3.5 py-2 font-mono text-[10.5px] tracking-[0.14em] text-mono-muted">
+          <div className="flex items-center justify-between rounded-[10px] border border-card-border bg-[#f6f1e6] px-3.5 py-2 font-mono text-[10.5px] tracking-[0.14em] text-mono-muted" data-tour="checkin-leg">
             <span>LEG {step.leg} OF {TOTAL_LEGS}</span>
             <span>{step.legLabel}</span>
           </div>
@@ -429,7 +465,7 @@ export default function CheckIn() {
               </div>
             )}
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3" data-tour="checkin-options">
               <div>
                 <div className="mb-1 font-mono text-[10px] font-bold tracking-[0.14em] text-mono-muted">
                   STEP {activeIndex + 1} OF {activeSteps.length}
@@ -459,7 +495,7 @@ export default function CheckIn() {
               )}
             </div>
 
-            <div className="flex items-center justify-between border-t border-divider bg-card pt-4">
+            <div className="flex items-center justify-between border-t border-divider bg-card pt-4" data-tour="checkin-nav">
               <button
                 type="button"
                 onClick={goBack}
@@ -481,7 +517,7 @@ export default function CheckIn() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2" data-tour="checkin-progress">
             <div className="flex justify-between font-mono text-[10.5px] tracking-[0.16em] text-mono-muted">
               <span>BOARDING PROGRESS</span>
               <span>
@@ -497,6 +533,8 @@ export default function CheckIn() {
           </div>
         </>
       )}
+
+      <Tour steps={STEPS_CHECKIN} open={tour.open} onClose={tour.close} />
     </div>
   );
 }
