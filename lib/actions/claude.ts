@@ -1,7 +1,16 @@
 "use server";
 
-import Anthropic from "@anthropic-ai/sdk";
 import type { Category, Verdict } from "@/lib/types";
+
+// Some hosts have slow/broken IPv6 routing, which stalls Node's default
+// dual-stack (Happy Eyeballs) connection attempts. Prefer IPv4 to avoid
+// spurious ETIMEDOUT failures reaching the classifier API.
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require("dns").setDefaultResultOrder("ipv4first");
+} catch {
+  /* not available in this runtime (e.g. edge) — safe to ignore */
+}
 
 /**
  * Structured guess for a user-typed item. Every field can be missing when the
@@ -25,69 +34,66 @@ const CATEGORIES: Category[] = [
 ];
 const VERDICTS: Verdict[] = ["bring-from-india", "buy-in-us", "either", "skip"];
 
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
+
+const SYSTEM_PROMPT =
+  "You classify packing items for an Indian student moving to the US for a masters degree. " +
+  "Respond with ONLY a JSON object (no prose, no markdown) with these fields:\n" +
+  `- canonicalName: string — a normalized item name\n` +
+  `- category: one of ${CATEGORIES.join(", ")}\n` +
+  `- weightKg: number — rough per-unit weight in kilograms\n` +
+  `- volumeL: number — rough per-unit packed volume in litres\n` +
+  `- cabin: one of must, never, prefer, either — TSA cabin rule (lithium electronics, meds, docs, cash → must; blades, cookers, liquids >100 ml, powders >350 ml → never; jackets, adapters → prefer; else either)\n` +
+  `- cabinNote: string — short note explaining the cabin rule (optional)\n` +
+  `- verdict: one of ${VERDICTS.join(", ")} — whether it's worth packing from India\n` +
+  `- rationale: string — one sentence on why bring, buy, or skip`;
+
 /**
- * Ask Claude to fill in the structured fields for a user-typed item name.
- * Uses Haiku 4.5 — the item classification task is cheap and speed matters
- * more than nuance in the UI. Returns aiFilled=false when the API key is
- * missing or the call fails, so the UI can still show the empty form.
+ * Ask a hosted LLM to fill in the structured fields for a user-typed item name.
+ * Uses Groq (Llama 3.3 70B) via its OpenAI-compatible endpoint — free-tier
+ * friendly and fast. Returns aiFilled=false when the API key is missing or the
+ * call fails, so the UI can still show the empty form for manual entry.
  */
 export async function classifyCustomItem(rawName: string): Promise<ClassifiedItem> {
   const name = rawName.trim();
   if (!name) return { aiFilled: false };
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return { aiFilled: false };
 
   try {
-    const client = new Anthropic({ apiKey });
-    const response = await client.messages.create({
-      model: "claude-haiku-4-5",
-      max_tokens: 512,
-      system:
-        "You classify packing items for an Indian student moving to the US for a masters degree. " +
-        "For each item, return: category (one of: documents, clothing, kitchen, food, medicines, " +
-        "electronics, bedding, toiletries, stationery, money, misc), an estimated per-unit weightKg, volumeL, " +
-        "whether it must/never/prefers the cabin per TSA rules (lithium electronics, meds, docs, " +
-        "cash → must; blades, cookers, liquids >100 ml, powders >350 ml → never; jackets, " +
-        "adapters → prefer; else omit), a verdict (bring-from-india, buy-in-us, either, or skip) " +
-        "reflecting whether it's worth packing from India, and a one-sentence rationale. " +
-        "Return only valid JSON matching the schema — no prose, no markdown fences.",
-      messages: [
-        {
-          role: "user",
-          content: `Classify this item: "${name}"`,
-        },
-      ],
-      tools: [
-        {
-          name: "classify_item",
-          description: "Record the structured fields for a packing item.",
-          input_schema: {
-            type: "object" as const,
-            properties: {
-              canonicalName: { type: "string", description: "Normalized item name" },
-              category: { type: "string", enum: CATEGORIES },
-              weightKg: { type: "number", description: "Rough per-unit weight in kilograms" },
-              volumeL: { type: "number", description: "Rough per-unit packed volume in litres" },
-              cabin: {
-                type: "string",
-                enum: ["must", "never", "prefer", "either"],
-                description: "TSA cabin rule; use 'either' when no strong preference",
-              },
-              cabinNote: { type: "string", description: "Optional short note explaining the cabin rule" },
-              verdict: { type: "string", enum: VERDICTS },
-              rationale: { type: "string", description: "One sentence: why bring, buy, or skip" },
-            },
-            required: ["category", "weightKg", "verdict", "rationale"],
-          },
-        },
-      ],
-      tool_choice: { type: "tool", name: "classify_item" },
+    const res = await fetch(GROQ_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        temperature: 0.2,
+        max_tokens: 400,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: `Classify this item: "${name}"` },
+        ],
+      }),
+      signal: AbortSignal.timeout(15000),
     });
 
-    const toolUse = response.content.find((b) => b.type === "tool_use");
-    if (!toolUse || toolUse.type !== "tool_use") return { aiFilled: false };
-    const input = toolUse.input as {
+    if (!res.ok) {
+      console.error("classifyCustomItem groq", res.status, await res.text());
+      return { aiFilled: false };
+    }
+
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) return { aiFilled: false };
+
+    const input = JSON.parse(content) as {
       canonicalName?: string;
       category?: string;
       weightKg?: number;
