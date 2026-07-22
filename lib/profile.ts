@@ -86,4 +86,7 @@ export const PROFILE_LABELS = {
     both: "Both",
     none: "Neither",
   },
+  workExperience: { yes: "Has work experience", no: "Fresh out of college" },
+  wearsGlasses: { yes: "Wears glasses / contacts", no: "No glasses" },
+  license: { yes: "Has a driving license", no: "No license" },
 } as const;

@@ -28,11 +28,16 @@ type StepKey =
   | "dietPractice"
   | "cuisine"
   | "cooking"
-  | "beverage";
+  | "beverage"
+  | "workExperience"
+  | "wearsGlasses"
+  | "license";
+
+const TOTAL_LEGS = 4;
 
 interface Step {
   key: StepKey;
-  leg: 1 | 2 | 3;
+  leg: 1 | 2 | 3 | 4;
   legLabel: string;
   prompt: string;
   type: "university" | "choice";
@@ -151,7 +156,7 @@ const STEPS: Step[] = [
     key: "beverage",
     leg: 3,
     legLabel: "YOUR KITCHEN",
-    prompt: "Last one: chai or filter coffee?",
+    prompt: "Chai or filter coffee?",
     type: "choice",
     visible: (p) => !(p.cooking === "rarely" && p.housing === "dorm"),
     options: [
@@ -159,6 +164,39 @@ const STEPS: Step[] = [
       { value: "chai", label: "Chai" },
       { value: "both", label: "Both" },
       { value: "none", label: "Neither" },
+    ],
+  },
+  {
+    key: "workExperience",
+    leg: 4,
+    legLabel: "YOUR BACKGROUND",
+    prompt: "Any work experience before this?",
+    type: "choice",
+    options: [
+      { value: "yes", label: "Yes — I've worked" },
+      { value: "no", label: "No — fresh out of college" },
+    ],
+  },
+  {
+    key: "wearsGlasses",
+    leg: 4,
+    legLabel: "YOUR BACKGROUND",
+    prompt: "Do you wear glasses or contacts?",
+    type: "choice",
+    options: [
+      { value: "yes", label: "Yes" },
+      { value: "no", label: "No" },
+    ],
+  },
+  {
+    key: "license",
+    leg: 4,
+    legLabel: "YOUR BACKGROUND",
+    prompt: "Last one: do you have an Indian driving license?",
+    type: "choice",
+    options: [
+      { value: "yes", label: "Yes" },
+      { value: "no", label: "No" },
     ],
   },
 ];
@@ -380,7 +418,7 @@ export default function CheckIn() {
       ) : (
         <>
           <div className="flex items-center justify-between rounded-[10px] border border-card-border bg-[#f6f1e6] px-3.5 py-2 font-mono text-[10.5px] tracking-[0.14em] text-mono-muted">
-            <span>LEG {step.leg} OF 3</span>
+            <span>LEG {step.leg} OF {TOTAL_LEGS}</span>
             <span>{step.legLabel}</span>
           </div>
 
@@ -514,6 +552,21 @@ function BoardingPass({
             label="DEFAULTS · OPTIONAL"
             value={profile.gender ? PROFILE_LABELS.gender[profile.gender] : "Skipped"}
             onClick={() => onEdit("gender")}
+          />
+          <ReviewChip
+            label="WORK EXPERIENCE"
+            value={profile.workExperience ? PROFILE_LABELS.workExperience[profile.workExperience] : "Not set"}
+            onClick={() => onEdit("workExperience")}
+          />
+          <ReviewChip
+            label="EYEWEAR"
+            value={profile.wearsGlasses ? PROFILE_LABELS.wearsGlasses[profile.wearsGlasses] : "Not set"}
+            onClick={() => onEdit("wearsGlasses")}
+          />
+          <ReviewChip
+            label="DRIVING LICENSE"
+            value={profile.license ? PROFILE_LABELS.license[profile.license] : "Not set"}
+            onClick={() => onEdit("license")}
           />
         </div>
         <div className="flex flex-col gap-2">

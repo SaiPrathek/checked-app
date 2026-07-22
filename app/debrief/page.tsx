@@ -23,11 +23,13 @@ const CATEGORY_ORDER: Category[] = [
   "documents",
   "medicines",
   "clothing",
+  "bedding",
   "kitchen",
   "food",
-  "electronics",
-  "bedding",
   "toiletries",
+  "electronics",
+  "stationery",
+  "misc",
   "money",
 ];
 
@@ -35,11 +37,13 @@ const CATEGORY_LABEL: Record<Category, string> = {
   documents: "Documents",
   medicines: "Medicines & health",
   clothing: "Clothing",
+  bedding: "Bedding",
   kitchen: "Kitchen",
   food: "Food",
-  electronics: "Electronics",
-  bedding: "Bedding",
   toiletries: "Toiletries & supplies",
+  electronics: "Electronics",
+  stationery: "Stationery",
+  misc: "Miscellaneous",
   money: "Money",
 };
 
@@ -67,13 +71,14 @@ export default function Debrief() {
 
   const listedItems = useMemo(() => {
     const byId = new Map(PACKING_ITEMS.map((i) => [i.id, i]));
+    // Only Hold-backed items can be debriefed — checklist-only items have no corpus entry to vote on.
     return list
       .map((id) => byId.get(id))
-      .filter((x): x is PackingItem => !!x);
+      .filter((x): x is PackingItem & { holdKey: string } => !!x && !!x.holdKey);
   }, [list]);
 
   const byCategory = useMemo(() => {
-    const map = new Map<Category, PackingItem[]>();
+    const map = new Map<Category, (PackingItem & { holdKey: string })[]>();
     for (const it of listedItems) {
       const arr = map.get(it.category) ?? [];
       arr.push(it);
@@ -86,6 +91,7 @@ export default function Debrief() {
     const set = new Set<string>();
     for (const it of listedItems) set.add(it.holdKey);
     return Array.from(set);
+    // (listedItems are guaranteed to have holdKey)
   }, [listedItems]);
 
   async function vote(holdKey: string, verdict: DebriefVerdict) {

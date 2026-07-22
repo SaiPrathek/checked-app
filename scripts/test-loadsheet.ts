@@ -37,11 +37,11 @@ function lines(entries: [string, number][]): LoadsheetLine[] {
 console.log("Scenario 1 · full realistic load");
 {
   const input = lines([
-    ["passport", 1], ["doc-copies", 1], ["photos", 10], ["rx", 1], ["otc-kit", 1],
-    ["glasses", 2], ["transit-jacket", 1], ["thermals", 5], ["everyday-clothes", 14],
-    ["shoes", 2], ["formal", 1], ["ethnic", 1], ["cooker", 1], ["tava", 1],
-    ["kitchen-basics", 1], ["spice-south", 1], ["filter-coffee-kit", 1],
-    ["pickles-podis", 2], ["instant", 12], ["snacks", 3], ["rice-dal", 3],
+    ["passport", 1], ["doc-copies", 1], ["photos", 10], ["rx", 1], ["med-kit", 1],
+    ["spectacles", 2], ["jacket", 1], ["thermals", 5], ["tshirts", 14],
+    ["shoes", 2], ["formal-suit", 1], ["traditional", 1], ["cooker", 1], ["cookware", 1],
+    ["prep-tools", 1], ["spice-south", 1], ["filter-coffee-kit", 1],
+    ["pickles", 2], ["instant", 12], ["snacks", 3], ["rice-dal", 3],
     ["laptop", 1], ["phone", 1], ["adapter", 2], ["toiletries", 1], ["forex", 1],
   ]);
   const r = computeLoadsheet(input, specs());
@@ -56,13 +56,13 @@ console.log("Scenario 1 · full realistic load");
   check("passport in cabin only", (r.alloc["passport"]?.cabin ?? 0) === 1 && !r.alloc["passport"]?.bag1 && !r.alloc["passport"]?.bag2);
   check("laptop in cabin", (r.alloc["laptop"]?.cabin ?? 0) === 1);
   check("cooker NOT in cabin", !r.alloc["cooker"]?.cabin);
-  check("kitchen-basics (knife) NOT in cabin", !r.alloc["kitchen-basics"]?.cabin);
+  check("kitchen-basics (knife) NOT in cabin", !r.alloc["prep-tools"]?.cabin);
   check("toiletries (liquids) NOT in cabin", !r.alloc["toiletries"]?.cabin);
   check("spice kit NOT in cabin", !r.alloc["spice-south"]?.cabin);
 
   // resilience seeding
-  check("2 outfits seeded in cabin", (r.alloc["everyday-clothes"]?.cabin ?? 0) >= 2,
-    `cabin clothes = ${r.alloc["everyday-clothes"]?.cabin}`);
+  check("2 outfits seeded in cabin", (r.alloc["tshirts"]?.cabin ?? 0) >= 2,
+    `cabin clothes = ${r.alloc["tshirts"]?.cabin}`);
 
   // limits respected
   for (const b of ["bag1", "bag2", "cabin"] as BagId[]) {
@@ -113,7 +113,7 @@ console.log("Scenario 4 · cabin-banned overflow never leaks into cabin");
 // ─── Scenario 5: determinism ─────────────────────────────────────────────────
 console.log("Scenario 5 · deterministic output");
 {
-  const input = lines([["everyday-clothes", 14], ["shoes", 2], ["cooker", 1], ["laptop", 1]]);
+  const input = lines([["tshirts", 14], ["shoes", 2], ["cooker", 1], ["laptop", 1]]);
   const a = JSON.stringify(computeLoadsheet(input, specs()).alloc);
   const b = JSON.stringify(computeLoadsheet(input, specs()).alloc);
   check("same input → same loadsheet", a === b);
@@ -122,12 +122,12 @@ console.log("Scenario 5 · deterministic output");
 // ─── Scenario 6: volume constraint binds before weight ───────────────────────
 console.log("Scenario 6 · volume-limited packing");
 {
-  // bedding is light (2.5kg) but bulky (12L): a tiny bag should refuse by volume
+  // blanket & pillow is light (1.5kg) but bulky (10L): a tiny bag should refuse by volume
   const tiny = bagSpecsFrom(["bag1", "bag2", "cabin"], { ...DIMS, bag1: { w: 40, h: 30, d: 15 }, bag2: { w: 40, h: 30, d: 15 }, cabin: { w: 30, h: 20, d: 10 } });
-  const input = lines([["bedding", 6]]); // 72L into ~15.3L bags
+  const input = lines([["blanket-pillow", 6]]); // 60L into ~15.3L bags
   const r = computeLoadsheet(input, tiny);
-  const placed = allocatedUnits(r.alloc["bedding"]);
-  check("volume caps placement", placed <= 2, `placed ${placed}`);
+  const placed = allocatedUnits(r.alloc["blanket-pillow"]);
+  check("volume caps placement", placed <= 3, `placed ${placed}`);
   check("unplaced reported", (r.unplaced[0]?.units ?? 0) === 6 - placed);
 }
 
@@ -136,7 +136,7 @@ console.log("Scenario 7 · backpack (cabin-class) fleet");
 {
   const input = lines([
     ["passport", 1], ["laptop", 1], ["phone", 1], ["forex", 1],
-    ["everyday-clothes", 14], ["cooker", 1], ["kitchen-basics", 1],
+    ["tshirts", 14], ["cooker", 1], ["prep-tools", 1],
   ]);
   // fleet: 1 checked + cabin + backpack
   const r = computeLoadsheet(input, specs(["bag1", "cabin", "backpack"]));
@@ -151,7 +151,7 @@ console.log("Scenario 7 · backpack (cabin-class) fleet");
   check("passport in the backpack", (r.alloc["passport"]?.backpack ?? 0) === 1);
   check("forex in the backpack", (r.alloc["forex"]?.backpack ?? 0) === 1);
   check("cooker NOT in cabin or backpack", !r.alloc["cooker"]?.cabin && !r.alloc["cooker"]?.backpack);
-  check("kitchen-basics (knife) NOT in backpack", !r.alloc["kitchen-basics"]?.backpack);
+  check("kitchen-basics (knife) NOT in backpack", !r.alloc["prep-tools"]?.backpack);
   check("no bag2 allocations exist", !Object.values(r.alloc).some((a) => (a.bag2 ?? 0) > 0));
   const placed = Object.values(r.alloc).reduce((s, a) => s + allocatedUnits(a), 0);
   const total = input.reduce((s, l) => s + l.qty, 0);
@@ -161,7 +161,7 @@ console.log("Scenario 7 · backpack (cabin-class) fleet");
 // ─── Scenario 8: single checked bag removed ──────────────────────────────────
 console.log("Scenario 8 · one checked bag only (bag2 removed)");
 {
-  const input = lines([["everyday-clothes", 14], ["shoes", 2], ["laptop", 1], ["passport", 1]]);
+  const input = lines([["tshirts", 14], ["shoes", 2], ["laptop", 1], ["passport", 1]]);
   const r = computeLoadsheet(input, specs(["bag1", "cabin"]));
   check("nothing allocated to removed bag2", !Object.values(r.alloc).some((a) => (a.bag2 ?? 0) > 0));
   check("bag1 within limit", r.totals.bag1.kg <= 23 + 1e-9, `${r.totals.bag1.kg.toFixed(1)} kg`);
@@ -172,7 +172,7 @@ console.log("Scenario 8 · one checked bag only (bag2 removed)");
 // ─── Scenario 9: no cabin bag → must-carry forced to checked with note ───────
 console.log("Scenario 9 · no cabin-class bag");
 {
-  const input = lines([["passport", 1], ["laptop", 1], ["everyday-clothes", 5]]);
+  const input = lines([["passport", 1], ["laptop", 1], ["tshirts", 5]]);
   const r = computeLoadsheet(input, specs(["bag1", "bag2"]));
   check("must-carry items still placed (in checked)", allocatedUnits(r.alloc["passport"]) === 1 && allocatedUnits(r.alloc["laptop"]) === 1);
   check("warns cabin bag is missing", r.notes.some((n) => n.text.toLowerCase().includes("cabin")));
@@ -183,8 +183,8 @@ console.log("Scenario 10 · backpack is the quick-access bag");
 {
   const input = lines([
     ["passport", 1], ["laptop", 1], ["phone", 1], ["rx", 1], ["forex", 1],
-    ["glasses", 2], ["transit-jacket", 1], ["adapter", 2],
-    ["everyday-clothes", 14], ["shoes", 2], ["toiletries", 1],
+    ["spectacles", 2], ["jacket", 1], ["adapter", 2],
+    ["tshirts", 14], ["shoes", 2], ["toiletries", 1],
   ]);
   // full fleet + backpack: 2 checked + cabin roller + backpack
   const r = computeLoadsheet(input, specs(["bag1", "bag2", "cabin", "backpack"]));
@@ -194,12 +194,12 @@ console.log("Scenario 10 · backpack is the quick-access bag");
     check(`${id} in backpack`, (r.alloc[id]?.backpack ?? 0) >= 1, JSON.stringify(r.alloc[id]));
   }
   // spare outfit seeded into the backpack (quick access, delay insurance)
-  check("spare outfit seeded in backpack", (r.alloc["everyday-clothes"]?.backpack ?? 0) >= 2,
-    `backpack clothes = ${r.alloc["everyday-clothes"]?.backpack}`);
-  check("nothing seeded to cabin roller for clothes", !(r.alloc["everyday-clothes"]?.cabin),
-    `cabin clothes = ${r.alloc["everyday-clothes"]?.cabin}`);
+  check("spare outfit seeded in backpack", (r.alloc["tshirts"]?.backpack ?? 0) >= 2,
+    `backpack clothes = ${r.alloc["tshirts"]?.backpack}`);
+  check("nothing seeded to cabin roller for clothes", !(r.alloc["tshirts"]?.cabin),
+    `cabin clothes = ${r.alloc["tshirts"]?.cabin}`);
   // bulky cabin-prefer items stay OUT of the small backpack — go to the roller
-  check("transit jacket in cabin roller, not backpack", (r.alloc["transit-jacket"]?.cabin ?? 0) === 1 && !r.alloc["transit-jacket"]?.backpack);
+  check("transit jacket in cabin roller, not backpack", (r.alloc["jacket"]?.cabin ?? 0) === 1 && !r.alloc["jacket"]?.backpack);
   check("adapters prefer the cabin roller", (r.alloc["adapter"]?.cabin ?? 0) >= 1);
   // backpack within its 7 kg limit
   check("backpack within 7 kg", r.totals.backpack.kg <= 7 + 1e-9, `${r.totals.backpack.kg.toFixed(1)} kg`);

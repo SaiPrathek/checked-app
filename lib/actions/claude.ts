@@ -21,7 +21,7 @@ export interface ClassifiedItem {
 
 const CATEGORIES: Category[] = [
   "documents", "clothing", "kitchen", "food", "medicines",
-  "electronics", "bedding", "toiletries", "money",
+  "electronics", "bedding", "toiletries", "stationery", "money", "misc",
 ];
 const VERDICTS: Verdict[] = ["bring-from-india", "buy-in-us", "either", "skip"];
 
@@ -46,7 +46,7 @@ export async function classifyCustomItem(rawName: string): Promise<ClassifiedIte
       system:
         "You classify packing items for an Indian student moving to the US for a masters degree. " +
         "For each item, return: category (one of: documents, clothing, kitchen, food, medicines, " +
-        "electronics, bedding, toiletries, money), an estimated per-unit weightKg, volumeL, " +
+        "electronics, bedding, toiletries, stationery, money, misc), an estimated per-unit weightKg, volumeL, " +
         "whether it must/never/prefers the cabin per TSA rules (lithium electronics, meds, docs, " +
         "cash → must; blades, cookers, liquids >100 ml, powders >350 ml → never; jackets, " +
         "adapters → prefer; else omit), a verdict (bring-from-india, buy-in-us, either, or skip) " +

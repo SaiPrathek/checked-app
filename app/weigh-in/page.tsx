@@ -3,13 +3,11 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useApp } from "@/lib/store";
-import { PACKING_ITEMS } from "@/lib/packing-items";
 import {
   BAG_CATALOG,
   bagDef,
   type BagId,
-  type Category,
-  type PackingItem,
+  type Packable,
 } from "@/lib/types";
 import {
   bagSpecsFrom,
@@ -19,12 +17,11 @@ import {
   type LoadsheetNote,
 } from "@/lib/loadsheet";
 import { Meter } from "@/components/ui/meter";
-
-const byId = new Map(PACKING_ITEMS.map((item) => [item.id, item]));
+import { ItemIcon } from "@/components/item-icon";
 
 /** Units of one item inside one bag (or the tray). */
 interface BagLine {
-  item: PackingItem;
+  item: Packable;
   units: number;
   kg: number;
   volL: number;
@@ -75,6 +72,7 @@ export default function WeighIn() {
     setUnits,
     applyLoadsheet,
     setBagActive,
+    getPackable,
     hydrated,
   } = useApp();
   const [view, setView] = useState<"case" | "classic">("case");
@@ -85,9 +83,9 @@ export default function WeighIn() {
   const items = useMemo(
     () =>
       list
-        .map((id) => byId.get(id))
-        .filter((item): item is PackingItem => Boolean(item)),
-    [list],
+        .map((id) => getPackable(id))
+        .filter((item): item is Packable => Boolean(item)),
+    [list, getPackable],
   );
 
   const { perBag, tray, violations, totalPackedKg } = useMemo(() => {
@@ -179,7 +177,7 @@ export default function WeighIn() {
                 ×{line.units}
               </span>
             )}
-            <CategoryIcon category={line.item.category} size={Math.round(size * 0.7)} />
+            <ItemIcon item={line.item} size={Math.round(size * 0.7)} />
           </button>
         );
       })
@@ -396,7 +394,7 @@ export default function WeighIn() {
                           ×{line.units}
                         </span>
                       )}
-                      <CategoryIcon category={line.item.category} size={32} />
+                      <ItemIcon item={line.item} size={32} />
                       <span className="text-center text-[11.5px] font-semibold leading-[1.25] text-ink">{line.item.name}</span>
                       <span className="font-mono text-[10px] text-mono-muted">{line.kg.toFixed(1)} kg</span>
                     </button>
@@ -608,7 +606,7 @@ function ClassicColumn({
           const warning = bagId ? placementWarning(line.item, bagId) : null;
           return (
             <div key={line.item.id} draggable onDragStart={(event) => event.dataTransfer.setData("text/plain", line.item.id)} className="cursor-grab rounded-[9px] border border-card-border bg-card px-2.5 py-2 active:cursor-grabbing">
-              <div className="flex items-center gap-2"><CategoryIcon category={line.item.category} size={20} /><span className="min-w-0 flex-1 truncate text-[13px] font-medium">{line.item.name}</span><span className="shrink-0 font-mono text-[11px] text-mono-muted">{line.units > 1 ? `×${line.units} · ` : ""}{line.kg.toFixed(1)} kg</span></div>
+              <div className="flex items-center gap-2"><ItemIcon item={line.item} size={20} /><span className="min-w-0 flex-1 truncate text-[13px] font-medium">{line.item.name}</span><span className="shrink-0 font-mono text-[11px] text-mono-muted">{line.units > 1 ? `×${line.units} · ` : ""}{line.kg.toFixed(1)} kg</span></div>
               {warning && <p className="m-0 mt-1 text-[11px] font-semibold text-[#b23127]">⚠ {warning}</p>}
               {bagId && total > 1 && (
                 <div className="mt-[7px] flex items-center gap-1.5 font-mono text-[10.5px] text-ink-muted">
@@ -631,19 +629,4 @@ function ClassicColumn({
       </div>
     </div>
   );
-}
-
-function CategoryIcon({ category, size }: { category: Category; size: number }) {
-  const common = { width: size, height: size, viewBox: "0 0 48 48", className: "shrink-0" };
-  const outline = "#14202e";
-  if (category === "documents") return <svg {...common}><rect x="11" y="7" width="26" height="34" rx="4" fill="#1466d8" stroke={outline} strokeWidth="2.5" /><circle cx="24" cy="19" r="6" fill="#f5a623" stroke={outline} strokeWidth="2" /><path d="M17 32h14" stroke="#fbf6ea" strokeWidth="2.5" strokeLinecap="round" /></svg>;
-  if (category === "clothing") return <svg {...common}><path d="M17 10 22 7h4l5 3 8 6-5 6-3-2v20H15V20l-3 2-5-6z" fill="#4fcb8b" stroke={outline} strokeWidth="2.5" strokeLinejoin="round" /><path d="M20 8c1 4 7 4 8 0" fill="none" stroke={outline} strokeWidth="2.5" strokeLinecap="round" /></svg>;
-  if (category === "kitchen") return <svg {...common}><circle cx="24" cy="11" r="3" fill="#f5a623" stroke={outline} strokeWidth="2" /><ellipse cx="24" cy="18" rx="14" ry="4.5" fill="#8fa3c4" stroke={outline} strokeWidth="2.5" /><path d="M10 18v10c0 6 6 10 14 10s14-4 14-10V18" fill="#8fa3c4" stroke={outline} strokeWidth="2.5" strokeLinejoin="round" /></svg>;
-  if (category === "food") return <svg {...common}><rect x="13" y="8" width="22" height="7" rx="2.5" fill={outline} stroke={outline} strokeWidth="2.5" /><path d="M15 15h18v20a5 5 0 0 1-5 5h-8a5 5 0 0 1-5-5z" fill="#f5a623" stroke={outline} strokeWidth="2.5" /><rect x="19" y="22" width="10" height="9" rx="2" fill="#fbf6ea" stroke={outline} strokeWidth="2" /></svg>;
-  if (category === "medicines") return <svg {...common}><rect x="8" y="13" width="32" height="26" rx="5" fill="#fbf6ea" stroke={outline} strokeWidth="2.5" /><path d="M18 13v-3a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v3" fill="none" stroke={outline} strokeWidth="2.5" /><path d="M21 21h6v5h5v6h-5v5h-6v-5h-5v-6h5z" fill="#d23b2e" stroke={outline} strokeWidth="2" /></svg>;
-  if (category === "electronics") return <svg {...common}><rect x="11" y="9" width="26" height="18" rx="3" fill={outline} stroke={outline} strokeWidth="2.5" /><rect x="14" y="12" width="20" height="12" rx="1.5" fill="#1466d8" /><path d="m8 33 3-6h26l3 6a3 3 0 0 1-3 4H11a3 3 0 0 1-3-4z" fill="#8fa3c4" stroke={outline} strokeWidth="2.5" /></svg>;
-  if (category === "bedding") return <svg {...common}><path d="M10 14c8-4 20-4 28 0-2 8-2 12 0 20-8 4-20 4-28 0 2-8 2-12 0-20z" fill="#e7f0fb" stroke={outline} strokeWidth="2.5" /><path d="M16 20c5-2 11-2 16 0" fill="none" stroke="#8fa3c4" strokeWidth="2.5" strokeLinecap="round" /></svg>;
-  if (category === "toiletries") return <svg {...common}><rect x="19" y="6" width="10" height="7" rx="2" fill={outline} stroke={outline} strokeWidth="2" /><path d="M17 15h14v20a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6z" fill="#1257b8" stroke={outline} strokeWidth="2.5" /><rect x="20" y="22" width="8" height="8" rx="2" fill="#fbf6ea" /></svg>;
-  if (category === "money") return <svg {...common}><rect x="7" y="13" width="34" height="22" rx="4" fill="#147a48" stroke={outline} strokeWidth="2.5" /><path d="M7 18h34v5H7z" fill={outline} /><rect x="12" y="27" width="12" height="4" rx="1.5" fill="#fbf6ea" /></svg>;
-  return <svg {...common}><rect x="9" y="12" width="30" height="26" rx="4" fill="#e4dccb" stroke={outline} strokeWidth="2.5" /></svg>;
 }

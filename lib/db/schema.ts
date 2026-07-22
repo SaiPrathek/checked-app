@@ -40,6 +40,9 @@ export const profiles = pgTable("profiles", {
   cuisine: text("cuisine"), // south | north | west | east
   cooking: text("cooking"), // daily | weekly | rarely
   beverage: text("beverage"), // filter-coffee | chai | both | none
+  workExperience: text("work_experience"), // yes | no
+  wearsGlasses: text("wears_glasses"), // yes | no
+  license: text("license"), // yes | no
   diet: text("diet"), // legacy; retained for read-time migration
   /** Weigh-In fleet: which bags are active, e.g. ["bag1","cabin","backpack"]. */
   bagConfig: jsonb("bag_config"),

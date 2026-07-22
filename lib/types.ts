@@ -7,7 +7,9 @@ export type Category =
   | "electronics"
   | "bedding"
   | "toiletries"
-  | "money";
+  | "stationery"
+  | "money"
+  | "misc";
 
 export type Verdict = "bring-from-india" | "buy-in-us" | "either" | "skip";
 
@@ -56,8 +58,18 @@ export interface HoldItem {
 export interface PackingItem {
   id: string;
   name: string;
-  /** links to HoldItem.item for verdict, reasoning, context and citations */
-  holdKey: string;
+  /**
+   * Links to HoldItem.item for verdict, reasoning, context and citations.
+   * Optional — items sourced from the packing-list checklist (no Hold entry)
+   * carry their own `verdict` + `detail` inline instead.
+   */
+  holdKey?: string;
+  /** Inline verdict when there's no Hold entry (else The Hold's verdict wins). */
+  verdict?: Verdict;
+  /** Inline explanation when there's no Hold entry (shown in the "Why?" panel). */
+  detail?: string;
+  /** Icon registry key (see components/item-icon.tsx); falls back to a category glyph. */
+  icon?: string;
   category: Category;
   /** rough per-unit weight (kg); Weigh-In multiplies by the user's chosen qty */
   weightKg: number;
@@ -79,6 +91,9 @@ export interface PackingItem {
     cooking?: Partial<Record<NonNullable<Profile["cooking"]>, number>>;
     beverage?: Partial<Record<NonNullable<Profile["beverage"]>, number>>;
     gender?: Partial<Record<NonNullable<Profile["gender"]>, number>>;
+    workExperience?: Partial<Record<NonNullable<Profile["workExperience"]>, number>>;
+    wearsGlasses?: Partial<Record<NonNullable<Profile["wearsGlasses"]>, number>>;
+    license?: Partial<Record<NonNullable<Profile["license"]>, number>>;
   };
   /**
    * Additive quantity deltas — every matching dimension contributes.
@@ -95,6 +110,9 @@ export interface PackingItem {
     cooking?: Partial<Record<NonNullable<Profile["cooking"]>, number>>;
     beverage?: Partial<Record<NonNullable<Profile["beverage"]>, number>>;
     gender?: Partial<Record<NonNullable<Profile["gender"]>, number>>;
+    workExperience?: Partial<Record<NonNullable<Profile["workExperience"]>, number>>;
+    wearsGlasses?: Partial<Record<NonNullable<Profile["wearsGlasses"]>, number>>;
+    license?: Partial<Record<NonNullable<Profile["license"]>, number>>;
   };
   /** Clamp bounds for the additive model; defaults 0 and 999. */
   minQty?: number;
@@ -114,6 +132,9 @@ export interface PackingItem {
     cooking?: Partial<Record<NonNullable<Profile["cooking"]>, Verdict>>;
     beverage?: Partial<Record<NonNullable<Profile["beverage"]>, Verdict>>;
     gender?: Partial<Record<NonNullable<Profile["gender"]>, Verdict>>;
+    workExperience?: Partial<Record<NonNullable<Profile["workExperience"]>, Verdict>>;
+    wearsGlasses?: Partial<Record<NonNullable<Profile["wearsGlasses"]>, Verdict>>;
+    license?: Partial<Record<NonNullable<Profile["license"]>, Verdict>>;
   };
   /** Do not show items irrelevant to this profile in the main Manifest. */
   visibleIf?: (profile: Profile) => boolean;
@@ -162,6 +183,10 @@ export interface Profile {
   cuisine?: "south" | "north" | "west" | "east";
   cooking?: "daily" | "weekly" | "rarely";
   beverage?: "filter-coffee" | "chai" | "both" | "none";
+  /** Optional background toggles that tailor document & misc counts. */
+  workExperience?: "yes" | "no";
+  wearsGlasses?: "yes" | "no";
+  license?: "yes" | "no";
   completed?: boolean;
 }
 
@@ -191,6 +216,8 @@ export interface Packable {
   volumeL?: number;
   transport?: { cabin: "must" | "never" | "prefer"; note?: string };
   cabinSeed?: number;
+  /** Icon registry key (see components/item-icon.tsx); falls back to a category glyph. */
+  icon?: string;
 }
 
 export function isCustomItemId(id: string): boolean {

@@ -6,10 +6,11 @@ import { useUser } from "@clerk/nextjs";
 import { useApp } from "@/lib/store";
 import { PACKING_ITEMS } from "@/lib/packing-items";
 import { getHoldItem } from "@/lib/hold";
-import { driverLabel, isItemVisible, itemName, qtyDrivers, recommendedQty, resolveGuidance } from "@/lib/guidance";
+import { driverLabel, isItemVisible, itemName, qtyDrivers, recommendedQty, resolveDetail, resolveGuidance } from "@/lib/guidance";
 import { CLIMATE_LABELS } from "@/lib/climate";
 import { PROFILE_LABELS } from "@/lib/profile";
 import type { Category, PackingItem, Profile } from "@/lib/types";
+import { ItemIcon } from "@/components/item-icon";
 import { VerdictBadge } from "@/components/ui/verdict-badge";
 import { CommunityStat } from "@/components/ui/community-stat";
 import { QtyStepper } from "@/components/ui/qty-stepper";
@@ -20,11 +21,13 @@ const CATEGORY_ORDER: Category[] = [
   "documents",
   "medicines",
   "clothing",
+  "bedding",
   "kitchen",
   "food",
-  "electronics",
-  "bedding",
   "toiletries",
+  "electronics",
+  "stationery",
+  "misc",
   "money",
 ];
 
@@ -32,11 +35,13 @@ const CATEGORY_LABEL: Record<Category, string> = {
   documents: "Documents",
   medicines: "Medicines & health",
   clothing: "Clothing",
+  bedding: "Bedding",
   kitchen: "Kitchen",
   food: "Food",
-  electronics: "Electronics",
-  bedding: "Bedding",
   toiletries: "Toiletries & supplies",
+  electronics: "Electronics",
+  stationery: "Stationery",
+  misc: "Miscellaneous",
   money: "Money",
 };
 
@@ -291,7 +296,7 @@ export default function Manifest() {
               listed={isListed(it.id)}
               qty={qtyFor(it.id)}
               open={expanded === it.id}
-              stat={stats.get(it.holdKey)}
+              stat={it.holdKey ? stats.get(it.holdKey) : undefined}
               onToggle={() => toggleListItem(it.id)}
               onQty={(qty) => setQtyForItem(it.id, qty)}
               onOpen={() => setExpanded(expanded === it.id ? null : it.id)}
@@ -313,7 +318,7 @@ export default function Manifest() {
                 listed={false}
                 qty={0}
                 open={expanded === it.id}
-                stat={stats.get(it.holdKey)}
+                stat={it.holdKey ? stats.get(it.holdKey) : undefined}
                 onToggle={() => toggleListItem(it.id)}
                 onQty={(qty) => setQtyForItem(it.id, qty)}
                 onOpen={() => setExpanded(expanded === it.id ? null : it.id)}
@@ -376,8 +381,8 @@ function ManifestRow({
   onOpen: () => void;
 }) {
   const hold = getHoldItem(item.holdKey);
-  if (!hold) return null;
   const guidance = resolveGuidance(hold, profile, item);
+  const detail = resolveDetail(hold, item);
   const displayName = itemName(item, profile);
   const coordinate = item.shareable && profile.roommates === "roommates";
   const drivers = qtyDrivers(item, profile);
@@ -393,6 +398,9 @@ function ManifestRow({
           className="mt-[3px] h-[17px] w-[17px] flex-shrink-0 cursor-pointer accent-primary"
           aria-label={`Add ${displayName} to my list`}
         />
+        <span className="mt-px flex-shrink-0 rounded-[8px] border border-card-border bg-[#f6f1e6] p-1">
+          <ItemIcon item={item} size={26} />
+        </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="text-[15px] font-semibold">{displayName}</span>
@@ -417,7 +425,12 @@ function ManifestRow({
           </button>
           {open && (
             <div className="mt-2.5 flex flex-col gap-2 border-l-2 border-[#eadfcb] pl-3">
-              <p className="m-0 text-[13.5px] leading-[1.55] text-ink-muted">{hold.detail}</p>
+              <div className="flex items-start gap-2.5">
+                <span className="mt-px flex-shrink-0 rounded-[8px] border border-card-border bg-[#f6f1e6] p-1.5">
+                  <ItemIcon item={item} size={30} />
+                </span>
+                <p className="m-0 text-[13.5px] leading-[1.55] text-ink-muted">{detail}</p>
+              </div>
               {drivers.length > 0 && (
                 <p className="m-0 text-[13px] leading-[1.5] text-ink">
                   <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-mono-muted">RECOMMENDED {recommended}</span>
@@ -433,7 +446,7 @@ function ManifestRow({
                   ))}
                 </p>
               )}
-              {guidance.shifted && (
+              {guidance.shifted && hold && (
                 <p className="m-0 text-[13px] leading-[1.5] text-ink">
                   <span className="font-bold text-primary">Verdict shifted for your profile</span> — the corpus default was <em>{hold.verdict}</em>.
                 </p>
@@ -443,20 +456,26 @@ function ManifestRow({
                   <span className="font-bold text-primary">For you:</span> {note}
                 </p>
               ))}
-              {hold.price?.note && <p className="m-0 text-[12.5px] text-ink-muted">💰 {hold.price.note}</p>}
-              <p className="m-0 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#a79e8b]">
-                Confidence {hold.confidence}
-                {hold.tags?.includes("community-pending")
-                  ? " · community pending"
-                  : hold.claimIds?.length
-                    ? ` · ${hold.claimIds.length} source${hold.claimIds.length > 1 ? "s" : ""} in The Hold`
-                    : ""}
-              </p>
+              {hold?.price?.note && <p className="m-0 text-[12.5px] text-ink-muted">💰 {hold.price.note}</p>}
+              {hold ? (
+                <p className="m-0 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#a79e8b]">
+                  Confidence {hold.confidence}
+                  {hold.tags?.includes("community-pending")
+                    ? " · community pending"
+                    : hold.claimIds?.length
+                      ? ` · ${hold.claimIds.length} source${hold.claimIds.length > 1 ? "s" : ""} in The Hold`
+                      : ""}
+                </p>
+              ) : (
+                <p className="m-0 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#a79e8b]">
+                  From your packing checklist
+                </p>
+              )}
             </div>
           )}
         </div>
         <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
-          <VerdictBadge verdict={guidance.verdict} contested={hold.contested} />
+          <VerdictBadge verdict={guidance.verdict} contested={hold?.contested ?? false} />
           <CommunityStat stat={stat} />
         </div>
       </div>

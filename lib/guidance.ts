@@ -27,6 +27,9 @@ const DIM_ORDER = [
   "cooking",
   "beverage",
   "gender",
+  "workExperience",
+  "wearsGlasses",
+  "license",
 ] as const;
 
 function profileValue(profile: Profile, dim: (typeof DIM_ORDER)[number]): string | undefined {
@@ -34,18 +37,21 @@ function profileValue(profile: Profile, dim: (typeof DIM_ORDER)[number]): string
 }
 
 /**
- * Resolves a Hold verdict against the user's Check-In profile.
- * Applies `verdictBy` shifts first (first matching dimension wins), then falls
- * back to the Hold's default. Also collects `context` notes as personal notes.
+ * Resolves a verdict against the user's Check-In profile.
+ * The base verdict comes from The Hold when present, else the item's inline
+ * `verdict` (checklist items with no Hold entry), else "either". `verdictBy`
+ * shifts apply on top (first matching dimension wins). `context` notes from The
+ * Hold are collected as personal notes.
  */
 export function resolveGuidance(
-  hold: HoldItem,
+  hold: HoldItem | undefined,
   profile: Profile,
   item?: PackingItem,
 ): ResolvedGuidance {
   const personalNotes: string[] = [];
-  const ctx = hold.context ?? {};
-  let verdict: Verdict = hold.verdict;
+  const ctx = (hold?.context ?? {}) as Record<string, Record<string, string> | undefined>;
+  const base: Verdict = hold?.verdict ?? item?.verdict ?? "either";
+  let verdict: Verdict = base;
   let shifted = false;
 
   const shiftMap = item?.verdictBy;
@@ -54,7 +60,7 @@ export function resolveGuidance(
       const v = profileValue(profile, dim);
       if (!v) continue;
       const shifted_v = (shiftMap[dim] as Record<string, Verdict> | undefined)?.[v];
-      if (shifted_v !== undefined && shifted_v !== hold.verdict) {
+      if (shifted_v !== undefined && shifted_v !== base) {
         verdict = shifted_v;
         shifted = true;
         break;
@@ -65,11 +71,16 @@ export function resolveGuidance(
   for (const dim of DIM_ORDER) {
     const v = profileValue(profile, dim);
     if (!v) continue;
-    const note = (ctx[dim] as Record<string, string> | undefined)?.[v];
+    const note = ctx[dim]?.[v];
     if (note) personalNotes.push(note);
   }
 
   return { verdict, shifted, personalNotes };
+}
+
+/** The "Why?" detail line — The Hold's when present, else the item's inline detail. */
+export function resolveDetail(hold: HoldItem | undefined, item: PackingItem): string {
+  return hold?.detail ?? item.detail ?? "";
 }
 
 /**
@@ -130,6 +141,9 @@ export function driverLabel(driver: QtyDriver): string {
     cooking: (v) => `cooks ${v}`,
     beverage: (v) => (v === "both" ? "coffee & chai" : v),
     gender: (v) => v,
+    workExperience: (v) => (v === "yes" ? "has work experience" : "no work experience"),
+    wearsGlasses: (v) => (v === "yes" ? "wears glasses" : "no glasses"),
+    license: (v) => (v === "yes" ? "has a license" : "no license"),
   };
   return map[driver.dimension](driver.value);
 }

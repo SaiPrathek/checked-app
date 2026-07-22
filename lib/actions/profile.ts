@@ -28,6 +28,9 @@ export async function getMyProfile(): Promise<Profile | null> {
     cuisine: (row.cuisine ?? undefined) as Profile["cuisine"],
     cooking: (row.cooking ?? undefined) as Profile["cooking"],
     beverage: (row.beverage ?? undefined) as Profile["beverage"],
+    workExperience: (row.workExperience ?? undefined) as Profile["workExperience"],
+    wearsGlasses: (row.wearsGlasses ?? undefined) as Profile["wearsGlasses"],
+    license: (row.license ?? undefined) as Profile["license"],
     diet: row.diet ?? undefined,
     completed: row.completed,
   });
@@ -54,6 +57,9 @@ export async function saveProfile(p: Profile): Promise<void> {
       cuisine: p.cuisine ?? null,
       cooking: p.cooking ?? null,
       beverage: p.beverage ?? null,
+      workExperience: p.workExperience ?? null,
+      wearsGlasses: p.wearsGlasses ?? null,
+      license: p.license ?? null,
       completed: p.completed ?? false,
     })
     .onConflictDoUpdate({
@@ -73,6 +79,9 @@ export async function saveProfile(p: Profile): Promise<void> {
         cuisine: sql`excluded.cuisine`,
         cooking: sql`excluded.cooking`,
         beverage: sql`excluded.beverage`,
+        workExperience: sql`excluded.work_experience`,
+        wearsGlasses: sql`excluded.wears_glasses`,
+        license: sql`excluded.license`,
         completed: sql`excluded.completed`,
         updatedAt: sql`now()`,
       },

@@ -7,6 +7,7 @@ import type { HoldItem } from "./types";
  */
 export const HOLD = (holdData as unknown as { items: HoldItem[] }).items;
 
-export function getHoldItem(key: string): HoldItem | undefined {
+export function getHoldItem(key: string | undefined): HoldItem | undefined {
+  if (!key) return undefined;
   return HOLD.find((h) => h.item === key);
 }
