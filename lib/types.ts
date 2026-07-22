@@ -165,6 +165,38 @@ export interface Profile {
   completed?: boolean;
 }
 
+/**
+ * A user-defined item that lives alongside PACKING_ITEMS but isn't in The Hold.
+ * Persisted per user; itemId in list_items/allocation uses the `custom:<id>` prefix.
+ */
+export interface CustomItem {
+  id: string; // stored id — always prefixed with "custom:"
+  name: string;
+  category: Category;
+  weightKg: number;
+  volumeL?: number;
+  transport?: { cabin: "must" | "never" | "prefer"; note?: string };
+  verdict?: Verdict; // AI or user-declared; no Hold entry
+  note?: string; // AI-generated rationale or user note
+  aiFilled?: boolean; // true when Claude classified this item
+  createdAt?: string;
+}
+
+/** Everything Weigh-In and the loadsheet need — satisfied by both PackingItem and CustomItem. */
+export interface Packable {
+  id: string;
+  name: string;
+  category: Category;
+  weightKg: number;
+  volumeL?: number;
+  transport?: { cabin: "must" | "never" | "prefer"; note?: string };
+  cabinSeed?: number;
+}
+
+export function isCustomItemId(id: string): boolean {
+  return id.startsWith("custom:");
+}
+
 export type BagId = "bag1" | "bag2" | "cabin" | "backpack";
 
 /** checked = goes in the hold (23 kg, no liquid/blade rules); cabin = carried on (7 kg, TSA rules apply). */

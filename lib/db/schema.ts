@@ -71,6 +71,30 @@ export const listItems = pgTable(
 );
 
 /**
+ * custom_items — user-defined items that live alongside the static PACKING_ITEMS.
+ * id is the "custom:<slug>" string used as itemId in list_items.
+ */
+export const customItems = pgTable(
+  "custom_items",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    id: text("id").notNull(),
+    name: text("name").notNull(),
+    category: text("category").notNull(),
+    weightKg: numeric("weight_kg").notNull(),
+    volumeL: numeric("volume_l"),
+    transport: jsonb("transport"),
+    verdict: text("verdict"),
+    note: text("note"),
+    aiFilled: boolean("ai_filled").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.userId, t.id] }) }),
+);
+
+/**
  * ─────────────────────────────────────────────────────────────
  * The Hold (corpus) mirrored into DB so we can query verdicts by
  * SQL and later aggregate community stats from debrief_responses.

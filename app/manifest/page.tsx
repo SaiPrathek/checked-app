@@ -260,9 +260,27 @@ export default function Manifest() {
             <h2 className="m-0 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-mono-muted">
               {CATEGORY_LABEL[activeCategory]}
             </h2>
-            <span className="text-[12px] text-ink-muted">
-              {activeItems.length} recommended
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] text-ink-muted">
+                {activeItems.filter((it) => isListed(it.id)).length}/{activeItems.length} selected
+              </span>
+              {activeItems.length > 0 && (() => {
+                const unlisted = activeItems.filter((it) => !isListed(it.id));
+                const allSelected = unlisted.length === 0;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targets = allSelected ? activeItems.filter((it) => isListed(it.id)) : unlisted;
+                      targets.forEach((it) => toggleListItem(it.id));
+                    }}
+                    className="rounded-full border border-field-border bg-card px-2.5 py-1 font-mono text-[10.5px] font-bold uppercase tracking-[0.12em] text-ink-muted transition-colors hover:border-primary hover:text-primary"
+                  >
+                    {allSelected ? "Clear all" : "Select all"}
+                  </button>
+                );
+              })()}
+            </div>
           </div>
           {activeItems.map((it, idx) => (
             <ManifestRow

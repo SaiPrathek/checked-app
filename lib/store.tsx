@@ -12,10 +12,13 @@ import {
 import { useUser } from "@clerk/nextjs";
 import {
   allocatedUnits,
+  isCustomItemId,
   orderBags,
   DEFAULT_ACTIVE_BAGS,
   type Allocation,
   type BagId,
+  type CustomItem,
+  type Packable,
   type Profile,
 } from "./types";
 import { PACKING_ITEMS } from "./packing-items";
@@ -31,6 +34,11 @@ import {
   importList,
 } from "./actions/list";
 import { getMyBagConfig, saveBagConfig } from "./actions/bags";
+import {
+  getMyCustomItems,
+  saveCustomItem as serverSaveCustomItem,
+  deleteCustomItem as serverDeleteCustomItem,
+} from "./actions/custom";
 
 interface AppState {
   profile: Profile;
@@ -42,6 +50,8 @@ interface AppState {
   alloc: Record<string, Allocation>;
   /** the user's active Weigh-In fleet (ordered) */
   activeBags: BagId[];
+  /** user-defined items (id prefix "custom:") — persist in localStorage + Neon */
+  customItems: CustomItem[];
   hydrated: boolean;
   /** true when we've loaded state from the server (signed-in users only) */
   serverSynced: boolean;
@@ -59,6 +69,12 @@ interface AppState {
   applyLoadsheet: (allocMap: Record<string, Allocation>) => void;
   /** add or remove a bag from the fleet; removing returns its units to the tray */
   setBagActive: (id: BagId, active: boolean) => void;
+  /** create or update a user-defined item; persists to localStorage + server */
+  saveCustomItem: (item: CustomItem) => void;
+  /** remove a user-defined item and any list/allocation entries for it */
+  removeCustomItem: (id: string) => void;
+  /** unified item lookup — returns PackingItem or CustomItem, whichever exists */
+  getPackable: (id: string) => Packable | undefined;
   reset: () => void;
 }
 
@@ -71,6 +87,7 @@ interface Persisted {
   qty: Record<string, number>;
   alloc: Record<string, Allocation>;
   activeBags: BagId[];
+  customItems?: CustomItem[];
 }
 
 /** Legacy persisted shape had bags: Record<itemId, BagId>. */
@@ -105,6 +122,7 @@ function loadLocal(): Persisted {
     qty: {},
     alloc: {},
     activeBags: [...DEFAULT_ACTIVE_BAGS],
+    customItems: [],
   };
   if (typeof window === "undefined") return empty;
   try {
@@ -117,6 +135,7 @@ function loadLocal(): Persisted {
         qty: parsed.qty ?? {},
         alloc: migrateAlloc(parsed),
         activeBags: sanitizeActiveBags(parsed.activeBags),
+        customItems: Array.isArray(parsed.customItems) ? (parsed.customItems as CustomItem[]) : [],
       };
     }
   } catch {
@@ -167,6 +186,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [qty, setQtyState] = useState<Record<string, number>>({});
   const [alloc, setAllocState] = useState<Record<string, Allocation>>({});
   const [activeBags, setActiveBagsState] = useState<BagId[]>([...DEFAULT_ACTIVE_BAGS]);
+  const [customItems, setCustomItemsState] = useState<CustomItem[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [serverSynced, setServerSynced] = useState(false);
 
@@ -181,6 +201,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setQtyState(p.qty ?? {});
     setAllocState(p.alloc ?? {});
     setActiveBagsState(p.activeBags);
+    setCustomItemsState(p.customItems ?? []);
     setHydrated(true);
   }, []);
 
@@ -196,10 +217,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     hydratedForUser.current = user.id;
 
     (async () => {
-      const [serverProfile, serverList, serverBags] = await Promise.all([
+      const [serverProfile, serverList, serverBags, serverCustom] = await Promise.all([
         getMyProfile(),
         getMyList(),
         getMyBagConfig(),
+        getMyCustomItems(),
       ]);
 
       const local = loadLocal();
@@ -229,6 +251,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           await saveBagConfig(local.activeBags);
           setActiveBagsState(local.activeBags);
         }
+        // migrate local custom items up (server empty check: no server list migrates all)
+        if (local.customItems && local.customItems.length > 0) {
+          for (const ci of local.customItems) {
+            await serverSaveCustomItem(ci).catch((e) => console.error("saveCustomItem", e));
+          }
+          setCustomItemsState(local.customItems);
+        }
       } else {
         if (serverProfile) setProfileState(serverProfile);
         if (serverList.length) {
@@ -243,6 +272,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setAllocState(a);
         }
         if (serverBags) setActiveBagsState(sanitizeActiveBags(serverBags));
+        if (serverCustom.length) setCustomItemsState(serverCustom);
       }
       setServerSynced(true);
     })().catch((e) => console.error("[Checked] server sync failed", e));
@@ -254,12 +284,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ profile, list, qty, alloc, activeBags }),
+        JSON.stringify({ profile, list, qty, alloc, activeBags, customItems }),
       );
     } catch {
       /* ignore */
     }
-  }, [profile, list, qty, alloc, activeBags, hydrated]);
+  }, [profile, list, qty, alloc, activeBags, customItems, hydrated]);
 
   const setProfile = useCallback(
     (p: Profile) => {
@@ -439,12 +469,57 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [isSignedIn],
   );
 
+  const saveCustomItem = useCallback(
+    (item: CustomItem) => {
+      setCustomItemsState((cur) => {
+        const idx = cur.findIndex((c) => c.id === item.id);
+        if (idx >= 0) {
+          const next = [...cur];
+          next[idx] = item;
+          return next;
+        }
+        return [...cur, item];
+      });
+      if (isSignedIn) serverSaveCustomItem(item).catch((e) => console.error("saveCustomItem", e));
+    },
+    [isSignedIn],
+  );
+
+  const removeCustomItem = useCallback(
+    (id: string) => {
+      setCustomItemsState((cur) => cur.filter((c) => c.id !== id));
+      // also remove it from list/qty/alloc if present
+      setList((cur) => cur.filter((x) => x !== id));
+      setQtyState((cur) => {
+        const next = { ...cur };
+        delete next[id];
+        return next;
+      });
+      setAllocState((cur) => {
+        const next = { ...cur };
+        delete next[id];
+        return next;
+      });
+      if (isSignedIn) serverDeleteCustomItem(id).catch((e) => console.error("deleteCustomItem", e));
+    },
+    [isSignedIn],
+  );
+
+  const getPackable = useCallback(
+    (id: string): Packable | undefined => {
+      if (isCustomItemId(id)) return customItems.find((c) => c.id === id);
+      return byId.get(id);
+    },
+    [customItems],
+  );
+
   const value: AppState = {
     profile,
     list,
     qty,
     alloc,
     activeBags,
+    customItems,
     hydrated,
     serverSynced,
     setProfile,
@@ -456,12 +531,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setUnits,
     applyLoadsheet,
     setBagActive,
+    saveCustomItem,
+    removeCustomItem,
+    getPackable,
     reset: () => {
       setProfileState({});
       setList([]);
       setQtyState({});
       setAllocState({});
       setActiveBagsState([...DEFAULT_ACTIVE_BAGS]);
+      setCustomItemsState([]);
     },
   };
 
