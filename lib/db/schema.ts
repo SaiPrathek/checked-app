@@ -98,6 +98,23 @@ export const customItems = pgTable(
 );
 
 /**
+ * checklist_checks — the gather/prep tracker. One row per (user, checklist key)
+ * that the user has ticked. Row presence = checked; unticking deletes the row.
+ * `key` is a ChecklistRow.id from lib/checklist.ts (static, kept in code).
+ */
+export const checklistChecks = pgTable(
+  "checklist_checks",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.userId, t.key] }) }),
+);
+
+/**
  * ─────────────────────────────────────────────────────────────
  * The Hold (corpus) mirrored into DB so we can query verdicts by
  * SQL and later aggregate community stats from debrief_responses.

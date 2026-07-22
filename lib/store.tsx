@@ -39,6 +39,11 @@ import {
   saveCustomItem as serverSaveCustomItem,
   deleteCustomItem as serverDeleteCustomItem,
 } from "./actions/custom";
+import {
+  getMyChecklist,
+  setChecklistCheck as serverSetChecklistCheck,
+  setChecklistChecks as serverSetChecklistChecks,
+} from "./actions/checklist";
 
 interface AppState {
   profile: Profile;
@@ -52,6 +57,8 @@ interface AppState {
   activeBags: BagId[];
   /** user-defined items (id prefix "custom:") — persist in localStorage + Neon */
   customItems: CustomItem[];
+  /** gather/prep checklist tick state, keyed by ChecklistRow.id (done-tracker only) */
+  checkedOff: Record<string, boolean>;
   hydrated: boolean;
   /** true when we've loaded state from the server (signed-in users only) */
   serverSynced: boolean;
@@ -75,6 +82,11 @@ interface AppState {
   removeCustomItem: (id: string) => void;
   /** unified item lookup — returns PackingItem or CustomItem, whichever exists */
   getPackable: (id: string) => Packable | undefined;
+  /** checklist tick state */
+  isChecked: (key: string) => boolean;
+  setChecked: (key: string, checked: boolean) => void;
+  /** bulk tick/untick — Check all / Clear on a category */
+  setCheckedMany: (keys: string[], checked: boolean) => void;
   reset: () => void;
 }
 
@@ -88,6 +100,7 @@ interface Persisted {
   alloc: Record<string, Allocation>;
   activeBags: BagId[];
   customItems?: CustomItem[];
+  checkedOff?: Record<string, boolean>;
 }
 
 /** Legacy persisted shape had bags: Record<itemId, BagId>. */
@@ -123,6 +136,7 @@ function loadLocal(): Persisted {
     alloc: {},
     activeBags: [...DEFAULT_ACTIVE_BAGS],
     customItems: [],
+    checkedOff: {},
   };
   if (typeof window === "undefined") return empty;
   try {
@@ -136,6 +150,8 @@ function loadLocal(): Persisted {
         alloc: migrateAlloc(parsed),
         activeBags: sanitizeActiveBags(parsed.activeBags),
         customItems: Array.isArray(parsed.customItems) ? (parsed.customItems as CustomItem[]) : [],
+        checkedOff:
+          parsed.checkedOff && typeof parsed.checkedOff === "object" ? parsed.checkedOff : {},
       };
     }
   } catch {
@@ -187,6 +203,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [alloc, setAllocState] = useState<Record<string, Allocation>>({});
   const [activeBags, setActiveBagsState] = useState<BagId[]>([...DEFAULT_ACTIVE_BAGS]);
   const [customItems, setCustomItemsState] = useState<CustomItem[]>([]);
+  const [checkedOff, setCheckedOffState] = useState<Record<string, boolean>>({});
   const [hydrated, setHydrated] = useState(false);
   const [serverSynced, setServerSynced] = useState(false);
 
@@ -202,6 +219,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setAllocState(p.alloc ?? {});
     setActiveBagsState(p.activeBags);
     setCustomItemsState(p.customItems ?? []);
+    setCheckedOffState(p.checkedOff ?? {});
     setHydrated(true);
   }, []);
 
@@ -217,11 +235,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     hydratedForUser.current = user.id;
 
     (async () => {
-      const [serverProfile, serverList, serverBags, serverCustom] = await Promise.all([
+      const [serverProfile, serverList, serverBags, serverCustom, serverChecked] = await Promise.all([
         getMyProfile(),
         getMyList(),
         getMyBagConfig(),
         getMyCustomItems(),
+        getMyChecklist(),
       ]);
 
       const local = loadLocal();
@@ -258,6 +277,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
           setCustomItemsState(local.customItems);
         }
+        // migrate local checklist ticks up
+        const localChecked = Object.keys(local.checkedOff ?? {}).filter((k) => local.checkedOff?.[k]);
+        if (localChecked.length > 0) {
+          await serverSetChecklistChecks(localChecked, true).catch((e) =>
+            console.error("setChecklistChecks", e),
+          );
+          setCheckedOffState(local.checkedOff ?? {});
+        }
       } else {
         if (serverProfile) setProfileState(serverProfile);
         if (serverList.length) {
@@ -273,6 +300,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         if (serverBags) setActiveBagsState(sanitizeActiveBags(serverBags));
         if (serverCustom.length) setCustomItemsState(serverCustom);
+        if (serverChecked.length) {
+          setCheckedOffState(Object.fromEntries(serverChecked.map((k) => [k, true])));
+        }
       }
       setServerSynced(true);
     })().catch((e) => console.error("[Checked] server sync failed", e));
@@ -284,12 +314,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ profile, list, qty, alloc, activeBags, customItems }),
+        JSON.stringify({ profile, list, qty, alloc, activeBags, customItems, checkedOff }),
       );
     } catch {
       /* ignore */
     }
-  }, [profile, list, qty, alloc, activeBags, customItems, hydrated]);
+  }, [profile, list, qty, alloc, activeBags, customItems, checkedOff, hydrated]);
 
   const setProfile = useCallback(
     (p: Profile) => {
@@ -513,6 +543,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [customItems],
   );
 
+  const setChecked = useCallback(
+    (key: string, checked: boolean) => {
+      setCheckedOffState((cur) => {
+        if (checked) return { ...cur, [key]: true };
+        const next = { ...cur };
+        delete next[key];
+        return next;
+      });
+      if (isSignedIn)
+        serverSetChecklistCheck(key, checked).catch((e) => console.error("setChecklistCheck", e));
+    },
+    [isSignedIn],
+  );
+
+  const setCheckedMany = useCallback(
+    (keys: string[], checked: boolean) => {
+      setCheckedOffState((cur) => {
+        const next = { ...cur };
+        for (const k of keys) {
+          if (checked) next[k] = true;
+          else delete next[k];
+        }
+        return next;
+      });
+      if (isSignedIn)
+        serverSetChecklistChecks(keys, checked).catch((e) => console.error("setChecklistChecks", e));
+    },
+    [isSignedIn],
+  );
+
   const value: AppState = {
     profile,
     list,
@@ -520,6 +580,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     alloc,
     activeBags,
     customItems,
+    checkedOff,
     hydrated,
     serverSynced,
     setProfile,
@@ -534,6 +595,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveCustomItem,
     removeCustomItem,
     getPackable,
+    isChecked: (key) => Boolean(checkedOff[key]),
+    setChecked,
+    setCheckedMany,
     reset: () => {
       setProfileState({});
       setList([]);
@@ -541,6 +605,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setAllocState({});
       setActiveBagsState([...DEFAULT_ACTIVE_BAGS]);
       setCustomItemsState([]);
+      setCheckedOffState({});
     },
   };
 

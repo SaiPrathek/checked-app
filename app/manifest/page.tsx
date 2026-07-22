@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { useApp } from "@/lib/store";
@@ -9,13 +9,36 @@ import { getHoldItem } from "@/lib/hold";
 import { driverLabel, isItemVisible, itemName, qtyDrivers, recommendedQty, resolveDetail, resolveGuidance } from "@/lib/guidance";
 import { CLIMATE_LABELS } from "@/lib/climate";
 import { PROFILE_LABELS } from "@/lib/profile";
-import type { Category, PackingItem, Profile } from "@/lib/types";
+import type { Category, CustomItem, PackingItem, Profile, Verdict } from "@/lib/types";
+import { isCustomItemId } from "@/lib/types";
+import { CHECKLIST, checklistFor, checklistProgress, type ChecklistRow } from "@/lib/checklist";
+import { classifyCustomItem } from "@/lib/actions/claude";
 import { ItemIcon } from "@/components/item-icon";
 import { VerdictBadge } from "@/components/ui/verdict-badge";
 import { CommunityStat } from "@/components/ui/community-stat";
 import { QtyStepper } from "@/components/ui/qty-stepper";
 import { getCommunityStats } from "@/lib/actions/debrief";
 import type { Stat } from "@/lib/debrief";
+
+const CATEGORY_OPTIONS: Category[] = [
+  "documents", "medicines", "clothing", "bedding", "kitchen",
+  "food", "toiletries", "electronics", "stationery", "misc", "money",
+];
+
+/** A CustomItem rendered through the same ManifestRow as catalog items. */
+function customAsPackingItem(c: CustomItem): PackingItem {
+  return {
+    id: c.id,
+    name: c.name,
+    category: c.category,
+    weightKg: c.weightKg,
+    volumeL: c.volumeL,
+    transport: c.transport,
+    verdict: c.verdict,
+    detail: c.note,
+    baseQty: 1,
+  };
+}
 
 const CATEGORY_ORDER: Category[] = [
   "documents",
@@ -54,11 +77,21 @@ export default function Manifest() {
     hydrated,
     qtyFor,
     setQtyForItem,
+    customItems,
+    saveCustomItem,
+    removeCustomItem,
+    getPackable,
+    checkedOff,
+    isChecked,
+    setChecked,
+    setCheckedMany,
   } = useApp();
   const { isSignedIn } = useUser();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<Category>("documents");
   const [stats, setStats] = useState<Map<string, Stat>>(new Map());
+  const [view, setView] = useState<"cards" | "checklist">("cards");
+  const [adding, setAdding] = useState(false);
 
   const visibleItems = useMemo(
     () => PACKING_ITEMS.filter((item) => isItemVisible(item, profile)),
@@ -81,16 +114,40 @@ export default function Manifest() {
     [list, profile, visibleItems],
   );
 
+  // Custom items grouped into their category, rendered through ManifestRow.
+  const customByCategory = useMemo(() => {
+    const map = new Map<Category, PackingItem[]>();
+    for (const c of customItems) {
+      const arr = map.get(c.category) ?? [];
+      arr.push(customAsPackingItem(c));
+      map.set(c.category, arr);
+    }
+    return map;
+  }, [customItems]);
+
+  // A category tab appears if it has packable cards, custom items, or checklist rows.
   const availableCategories = useMemo(
-    () => CATEGORY_ORDER.filter((category) =>
-      visibleItems.some((item) => item.category === category),
-    ),
-    [visibleItems],
+    () =>
+      CATEGORY_ORDER.filter(
+        (category) =>
+          visibleItems.some((item) => item.category === category) ||
+          customByCategory.has(category) ||
+          CHECKLIST.some((r) => r.category === category),
+      ),
+    [visibleItems, customByCategory],
   );
-  const activeItems = grouped.get(activeCategory) ?? [];
+  const activeItems = [
+    ...(grouped.get(activeCategory) ?? []),
+    ...(customByCategory.get(activeCategory) ?? []),
+  ];
   const activeNotNeeded = notNeeded.filter(
     (item) => item.category === activeCategory,
   );
+  const activeChecklist = useMemo(
+    () => checklistFor(activeCategory, profile),
+    [activeCategory, profile],
+  );
+  const checklistDone = checklistProgress(activeChecklist, checkedOff);
 
   useEffect(() => {
     if (!availableCategories.includes(activeCategory) && availableCategories[0]) {
@@ -151,7 +208,7 @@ export default function Manifest() {
             <div className="font-mono text-[22px] font-bold text-ink">
               {list
                 .reduce((s, id) => {
-                  const it = PACKING_ITEMS.find((p) => p.id === id);
+                  const it = getPackable(id);
                   return s + (it ? it.weightKg * qtyFor(id) : 0);
                 }, 0)
                 .toFixed(1)}
@@ -261,38 +318,90 @@ export default function Manifest() {
           id={`manifest-panel-${activeCategory}`}
           aria-labelledby={`manifest-tab-${activeCategory}`}
         >
-          <div className="flex items-center justify-between gap-3 border-b border-divider px-4 py-3">
-            <h2 className="m-0 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-mono-muted">
-              {CATEGORY_LABEL[activeCategory]}
-            </h2>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-divider px-4 py-3">
             <div className="flex items-center gap-3">
-              <span className="text-[12px] text-ink-muted">
-                {activeItems.filter((it) => isListed(it.id)).length}/{activeItems.length} selected
-              </span>
-              {activeItems.length > 0 && (() => {
-                const unlisted = activeItems.filter((it) => !isListed(it.id));
-                const allSelected = unlisted.length === 0;
-                return (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const targets = allSelected ? activeItems.filter((it) => isListed(it.id)) : unlisted;
-                      targets.forEach((it) => toggleListItem(it.id));
-                    }}
-                    className="rounded-full border border-field-border bg-card px-2.5 py-1 font-mono text-[10.5px] font-bold uppercase tracking-[0.12em] text-ink-muted transition-colors hover:border-primary hover:text-primary"
-                  >
-                    {allSelected ? "Clear all" : "Select all"}
-                  </button>
-                );
-              })()}
+              <h2 className="m-0 font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-mono-muted">
+                {CATEGORY_LABEL[activeCategory]}
+              </h2>
+              {/* Cards | Checklist view toggle */}
+              <div className="flex items-center gap-1 rounded-full border border-field-border bg-[#f6f1e6] p-0.5">
+                <ManifestViewButton active={view === "cards"} onClick={() => setView("cards")}>Cards</ManifestViewButton>
+                <ManifestViewButton
+                  active={view === "checklist"}
+                  onClick={() => { setView("checklist"); setAdding(false); }}
+                  disabled={activeChecklist.length === 0}
+                >
+                  Checklist
+                </ManifestViewButton>
+              </div>
             </div>
+            {view === "cards" ? (
+              <div className="flex items-center gap-3">
+                <span className="text-[12px] text-ink-muted">
+                  {activeItems.filter((it) => isListed(it.id)).length}/{activeItems.length} selected
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAdding((v) => !v)}
+                  className="rounded-full border border-field-border bg-card px-2.5 py-1 font-mono text-[10.5px] font-bold uppercase tracking-[0.12em] text-ink-muted transition-colors hover:border-primary hover:text-primary"
+                >
+                  {adding ? "Close" : "+ Add item"}
+                </button>
+                {activeItems.length > 0 && (() => {
+                  const unlisted = activeItems.filter((it) => !isListed(it.id));
+                  const allSelected = unlisted.length === 0;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targets = allSelected ? activeItems.filter((it) => isListed(it.id)) : unlisted;
+                        targets.forEach((it) => toggleListItem(it.id));
+                      }}
+                      className="rounded-full border border-field-border bg-card px-2.5 py-1 font-mono text-[10.5px] font-bold uppercase tracking-[0.12em] text-ink-muted transition-colors hover:border-primary hover:text-primary"
+                    >
+                      {allSelected ? "Clear all" : "Select all"}
+                    </button>
+                  );
+                })()}
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <span className="text-[12px] text-ink-muted">
+                  {checklistDone.done}/{checklistDone.total} gathered
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCheckedMany(activeChecklist.map((r) => r.id), checklistDone.done < checklistDone.total)}
+                  className="rounded-full border border-field-border bg-card px-2.5 py-1 font-mono text-[10.5px] font-bold uppercase tracking-[0.12em] text-ink-muted transition-colors hover:border-primary hover:text-primary"
+                >
+                  {checklistDone.done < checklistDone.total ? "Check all" : "Clear"}
+                </button>
+              </div>
+            )}
           </div>
+
+          {view === "checklist" ? (
+            <ChecklistTable rows={activeChecklist} isChecked={isChecked} setChecked={setChecked} />
+          ) : (
+          <>
+          {adding && (
+            <AddCustomForm
+              defaultCategory={activeCategory}
+              onCancel={() => setAdding(false)}
+              onSave={(item) => {
+                saveCustomItem(item);
+                if (!isListed(item.id)) toggleListItem(item.id);
+                setActiveCategory(item.category);
+                setAdding(false);
+              }}
+            />
+          )}
           {activeItems.map((it, idx) => (
             <ManifestRow
               key={it.id}
               item={it}
               profile={profile}
-              first={idx === 0}
+              first={idx === 0 && !adding}
               listed={isListed(it.id)}
               qty={qtyFor(it.id)}
               open={expanded === it.id}
@@ -300,6 +409,7 @@ export default function Manifest() {
               onToggle={() => toggleListItem(it.id)}
               onQty={(qty) => setQtyForItem(it.id, qty)}
               onOpen={() => setExpanded(expanded === it.id ? null : it.id)}
+              onRemove={isCustomItemId(it.id) ? () => removeCustomItem(it.id) : undefined}
             />
           ))}
 
@@ -326,6 +436,8 @@ export default function Manifest() {
                 ))}
               </div>
             </details>
+          )}
+          </>
           )}
         </div>
       </section>
@@ -368,6 +480,7 @@ function ManifestRow({
   onToggle,
   onQty,
   onOpen,
+  onRemove,
 }: {
   item: PackingItem;
   profile: Profile;
@@ -379,6 +492,7 @@ function ManifestRow({
   onToggle: () => void;
   onQty: (qty: number) => void;
   onOpen: () => void;
+  onRemove?: () => void;
 }) {
   const hold = getHoldItem(item.holdKey);
   const guidance = resolveGuidance(hold, profile, item);
@@ -408,6 +522,11 @@ function ManifestRow({
               {item.weightKg.toFixed(1)} kg
               {listed && qty > 1 && <> · {(item.weightKg * qty).toFixed(1)} total</>}
             </span>
+            {onRemove && (
+              <span className="rounded-full border border-[#d8cebb] bg-[#f6f1e6] px-2 py-0.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.12em] text-mono-muted">
+                Yours
+              </span>
+            )}
           </div>
           {coordinate && (
             <span className="mt-1.5 inline-flex rounded-full border border-[#b9d8ca] bg-[#edf7f1] px-2.5 py-1 text-[11px] font-semibold text-good">
@@ -477,7 +596,268 @@ function ManifestRow({
         <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
           <VerdictBadge verdict={guidance.verdict} contested={hold?.contested ?? false} />
           <CommunityStat stat={stat} />
+          {onRemove && (
+            <button
+              type="button"
+              onClick={onRemove}
+              aria-label={`Remove ${displayName}`}
+              title="Remove this custom item"
+              className="grid h-6 w-6 place-items-center rounded-full text-mono-muted transition-colors hover:bg-[#fbe8e5] hover:text-[#b23127]"
+            >
+              ✕
+            </button>
+          )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ManifestViewButton({
+  active,
+  onClick,
+  disabled,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={
+        active
+          ? "rounded-full bg-nav px-3 py-1 text-[12px] font-semibold text-nav-text"
+          : "rounded-full px-3 py-1 text-[12px] font-semibold text-ink-muted transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
+const BUYING_PLACE: Record<ChecklistRow["buyingPlace"], { label: string; cls: string }> = {
+  IN: { label: "India", cls: "border-[#b9d8ca] bg-[#edf7f1] text-good" },
+  US: { label: "USA", cls: "border-[#bdd6f5] bg-[#e7f0fb] text-[#1257b8]" },
+  NA: { label: "Prepare", cls: "border-field-border bg-[#f6f1e6] text-mono-muted" },
+};
+
+function ChecklistTable({
+  rows,
+  isChecked,
+  setChecked,
+}: {
+  rows: ChecklistRow[];
+  isChecked: (key: string) => boolean;
+  setChecked: (key: string, checked: boolean) => void;
+}) {
+  if (rows.length === 0) {
+    return (
+      <p className="px-4 py-8 text-center text-[13px] text-ink-muted">
+        No checklist rows for this section.
+      </p>
+    );
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[560px] border-collapse text-left">
+        <thead>
+          <tr className="border-b border-divider bg-[#f6f1e6] font-mono text-[10px] uppercase tracking-[0.14em] text-mono-muted">
+            <th className="w-10 px-4 py-2.5 text-center" scope="col">✓</th>
+            <th className="px-2 py-2.5" scope="col">Item</th>
+            <th className="px-2 py-2.5" scope="col">Quantity</th>
+            <th className="px-2 py-2.5" scope="col">Buying place</th>
+            <th className="px-2 py-2.5 pr-4" scope="col">Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const checked = isChecked(row.id);
+            const bp = BUYING_PLACE[row.buyingPlace];
+            return (
+              <tr
+                key={row.id}
+                className={
+                  "border-b border-divider align-top transition-colors " +
+                  (checked ? "bg-[#f3f8f2]" : "hover:bg-[#faf6ec]")
+                }
+              >
+                <td className="px-4 py-3 text-center">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => setChecked(row.id, e.target.checked)}
+                    className="h-[17px] w-[17px] cursor-pointer accent-good"
+                    aria-label={`Mark ${row.item} as gathered`}
+                  />
+                </td>
+                <td className="px-2 py-3">
+                  <span className={"text-[13.5px] font-semibold " + (checked ? "text-mono-muted line-through" : "text-ink")}>
+                    {row.item}
+                  </span>
+                </td>
+                <td className="px-2 py-3 font-mono text-[12px] text-ink-muted">{row.quantity}</td>
+                <td className="px-2 py-3">
+                  <span className={"inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold " + bp.cls}>
+                    {bp.label}
+                  </span>
+                </td>
+                <td className="px-2 py-3 pr-4 text-[12.5px] text-ink-muted">{row.note ?? ""}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AddCustomForm({
+  defaultCategory,
+  onSave,
+  onCancel,
+}: {
+  defaultCategory: Category;
+  onSave: (item: CustomItem) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState<Category>(defaultCategory);
+  const [weightKg, setWeightKg] = useState("0.3");
+  const [verdict, setVerdict] = useState<Verdict>("bring-from-india");
+  const [note, setNote] = useState("");
+  const [aiFilled, setAiFilled] = useState(false);
+  const [classifying, setClassifying] = useState(false);
+
+  async function askClaude() {
+    if (!name.trim()) return;
+    setClassifying(true);
+    try {
+      const r = await classifyCustomItem(name.trim());
+      if (r.name) setName(r.name);
+      if (r.category) setCategory(r.category);
+      if (typeof r.weightKg === "number") setWeightKg(String(r.weightKg));
+      if (r.verdict) setVerdict(r.verdict);
+      if (r.note) setNote(r.note);
+      setAiFilled(r.aiFilled);
+    } catch (e) {
+      console.error("classifyCustomItem", e);
+    } finally {
+      setClassifying(false);
+    }
+  }
+
+  function save() {
+    const clean = name.trim();
+    if (!clean) return;
+    const slug = clean.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "item";
+    const item: CustomItem = {
+      id: `custom:${slug}-${Date.now().toString(36)}`,
+      name: clean,
+      category,
+      weightKg: Math.max(0.01, Number(weightKg) || 0.3),
+      verdict,
+      note: note.trim() || undefined,
+      aiFilled,
+      createdAt: new Date().toISOString(),
+    };
+    onSave(item);
+  }
+
+  return (
+    <div className="flex flex-col gap-3 border-b border-divider bg-[#f6f1e6] p-4">
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex min-w-[200px] flex-1 flex-col gap-1">
+          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-mono-muted">Item name</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") askClaude(); }}
+            placeholder="e.g. Yoga mat"
+            className="h-10 rounded-[9px] border border-field-border bg-card px-3 text-[14px] text-ink"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={askClaude}
+          disabled={!name.trim() || classifying}
+          className="h-10 rounded-[9px] border border-primary bg-card px-3.5 text-[13px] font-semibold text-primary transition-colors hover:bg-[#eef2fb] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {classifying ? "Asking Claude…" : "✦ Ask Claude to fill this in"}
+        </button>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <label className="flex flex-col gap-1">
+          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-mono-muted">Category</span>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value as Category)}
+            className="h-9 rounded-[9px] border border-field-border bg-card px-2 text-[13px] text-ink"
+          >
+            {CATEGORY_OPTIONS.map((c) => (
+              <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-mono-muted">Weight (kg)</span>
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            value={weightKg}
+            onChange={(e) => setWeightKg(e.target.value)}
+            className="h-9 w-24 rounded-[9px] border border-field-border bg-card px-2 text-[13px] text-ink"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-mono-muted">Verdict</span>
+          <select
+            value={verdict}
+            onChange={(e) => setVerdict(e.target.value as Verdict)}
+            className="h-9 rounded-[9px] border border-field-border bg-card px-2 text-[13px] text-ink"
+          >
+            <option value="bring-from-india">Bring from India</option>
+            <option value="buy-in-us">Buy in the US</option>
+            <option value="either">Either</option>
+            <option value="skip">Skip</option>
+          </select>
+        </label>
+      </div>
+
+      <label className="flex flex-col gap-1">
+        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-mono-muted">
+          Note {aiFilled && <span className="text-primary">· AI-filled, edit freely</span>}
+        </span>
+        <input
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Optional — why bring/buy/skip"
+          className="h-9 rounded-[9px] border border-field-border bg-card px-3 text-[13px] text-ink"
+        />
+      </label>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={save}
+          disabled={!name.trim()}
+          className="h-10 rounded-[9px] bg-primary px-4 text-[13.5px] font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Add to Manifest
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="h-10 rounded-[9px] border border-field-border bg-card px-4 text-[13.5px] font-semibold text-ink-muted transition-colors hover:bg-divider"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   );
