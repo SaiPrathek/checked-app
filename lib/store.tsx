@@ -331,6 +331,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })().catch((e) => {
       console.error("[Checked] server sync failed", e);
       setSyncError(true);
+      // Unblock the UI even when the pull fails — render local data (kept in
+      // localStorage) alongside the sync-error banner, rather than stranding
+      // signed-in users on the loading gate forever.
+      setServerSynced(true);
     });
   }, [hydrated, isLoaded, isSignedIn, user]);
 

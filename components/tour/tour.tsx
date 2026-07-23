@@ -182,24 +182,58 @@ export function Tour({ steps, open, onClose }: TourProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, index, steps]);
 
-  // Keyboard: Esc closes, arrows / Enter navigate.
+  // Keyboard: Esc closes, arrows navigate, Tab is trapped inside the dialog.
+  // (Enter/Space are left to the natively-focused button so Back/Skip work.)
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.preventDefault();
         finish();
-      } else if (e.key === "ArrowRight" || e.key === "Enter") {
+      } else if (e.key === "ArrowRight") {
         e.preventDefault();
         goNext();
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
         goBack();
+      } else if (e.key === "Tab") {
+        const root = tooltipRef.current;
+        if (!root) return;
+        const f = root.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        );
+        if (f.length === 0) return;
+        const first = f[0];
+        const last = f[f.length - 1];
+        const active = document.activeElement;
+        if (e.shiftKey) {
+          if (active === first || !root.contains(active)) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else if (active === last || !root.contains(active)) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, finish, goNext, goBack]);
+
+  // Move focus into the dialog on open and on each step change, so keyboard and
+  // screen-reader users are placed inside the tour (paired with the Tab trap
+  // above and focus restoration in finish()).
+  useEffect(() => {
+    if (!open) return;
+    const t = window.setTimeout(() => {
+      const root = tooltipRef.current;
+      if (!root) return;
+      const buttons = root.querySelectorAll<HTMLButtonElement>("button");
+      (buttons[buttons.length - 1] ?? buttons[0])?.focus();
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [open, index]);
 
   if (!mounted || !open || !rect) return null;
 
@@ -216,7 +250,13 @@ export function Tour({ steps, open, onClose }: TourProps) {
   const isFirst = findValid(steps, index - 1, -1) === -1;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100]" aria-live="polite" role="dialog" aria-modal="true">
+    <div
+      className="fixed inset-0 z-[100]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="tour-title"
+      aria-describedby="tour-body"
+    >
       {/* Transparent click-catcher — the dimming comes from the spotlight's shadow. */}
       <div className="absolute inset-0" onClick={finish} />
 
@@ -242,8 +282,8 @@ export function Tour({ steps, open, onClose }: TourProps) {
         <div className="mb-1.5 font-mono text-[10.5px] tracking-[0.18em] text-mono-muted">
           {String(humanCurrent).padStart(2, "0")} / {String(humanTotal).padStart(2, "0")}
         </div>
-        <h3 className="font-display text-[16px] font-bold text-ink">{step.title}</h3>
-        <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink-muted">{step.body}</p>
+        <h3 id="tour-title" className="font-display text-[16px] font-bold text-ink">{step.title}</h3>
+        <p id="tour-body" className="mt-1.5 text-[13.5px] leading-relaxed text-ink-muted">{step.body}</p>
         <div className="mt-4 flex items-center justify-between gap-2">
           <Button variant="ghost" size="sm" onClick={finish} className="px-2 text-[12.5px]">
             Skip tour
