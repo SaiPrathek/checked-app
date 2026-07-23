@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import {
   GROQ_URL,
   GROQ_MODEL,
@@ -6,6 +7,7 @@ import {
   buildTowerMessages,
   lookupSources,
 } from "@/lib/tower";
+import { bumpAiUsage } from "@/lib/actions/ai-usage";
 import type { Profile } from "@/lib/types";
 
 // Node runtime for reliable streaming + the IPv4 fetch fix mirrored from
@@ -35,6 +37,11 @@ export async function POST(req: NextRequest) {
   // Signal the client to fall back to plain source cards, not a hard failure.
   if (!apiKey) return bad(503, "nokey");
 
+  // Live generation is sign-in-gated so the shared Groq key can't be drained
+  // anonymously. The client keeps showing the grounded source cards regardless.
+  const { userId } = await auth();
+  if (!userId) return bad(401, "signin");
+
   let body: TowerBody;
   try {
     body = (await req.json()) as TowerBody;
@@ -48,6 +55,10 @@ export async function POST(req: NextRequest) {
   // Ground strictly on the sources the client already resolved + displayed.
   const sources = lookupSources(Array.isArray(body.sourceKeys) ? body.sourceKeys : []);
   if (sources.length === 0) return bad(422, "no-sources");
+
+  // Charge one against the daily allowance now that we're committed to a call.
+  const usage = await bumpAiUsage(userId, "tower");
+  if (!usage.ok) return bad(429, "limit");
 
   const messages = buildTowerMessages(query, sources, body.profile);
 

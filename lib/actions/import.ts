@@ -1,11 +1,13 @@
 "use server";
 
+import { auth } from "@clerk/nextjs/server";
 import {
   catalogForPrompt,
   MAX_IMPORT_CHARS,
   MAX_IMPORT_ROWS,
   type ImportMatch,
 } from "@/lib/import";
+import { bumpAiUsage } from "@/lib/actions/ai-usage";
 import { PACKING_ITEMS } from "@/lib/packing-items";
 import type { Category, Verdict } from "@/lib/types";
 
@@ -55,6 +57,13 @@ export async function aiMatchImport(raw: string): Promise<ImportMatch[] | null> 
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return null;
+
+  // Sign-in-gated + daily-capped; null makes the caller fall back to the
+  // deterministic local parseRows + localMatch path.
+  const { userId } = await auth();
+  if (!userId) return null;
+  const usage = await bumpAiUsage(userId, "import");
+  if (!usage.ok) return null;
 
   try {
     const res = await fetch(GROQ_URL, {

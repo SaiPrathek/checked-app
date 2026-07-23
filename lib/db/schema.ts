@@ -115,6 +115,25 @@ export const checklistChecks = pgTable(
 );
 
 /**
+ * ai_usage — per-user, per-day counter for Groq-backed AI calls (Tower,
+ * Import, custom-item classify). Backs the abuse/cost cap so a signed-in user
+ * can't drain the shared API key. `day` is a "YYYY-MM-DD" UTC string; rows
+ * accrete one per active day and are cheap to leave in place.
+ */
+export const aiUsage = pgTable(
+  "ai_usage",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    day: text("day").notNull(), // YYYY-MM-DD (UTC)
+    feature: text("feature").notNull(), // tower | import | classify
+    count: integer("count").notNull().default(0),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.userId, t.day, t.feature] }) }),
+);
+
+/**
  * ─────────────────────────────────────────────────────────────
  * The Hold (corpus) mirrored into DB so we can query verdicts by
  * SQL and later aggregate community stats from debrief_responses.

@@ -1,5 +1,7 @@
 "use server";
 
+import { auth } from "@clerk/nextjs/server";
+import { bumpAiUsage } from "@/lib/actions/ai-usage";
 import type { Category, Verdict } from "@/lib/types";
 
 // Some hosts have slow/broken IPv6 routing, which stalls Node's default
@@ -61,6 +63,12 @@ export async function classifyCustomItem(rawName: string): Promise<ClassifiedIte
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return { aiFilled: false };
+
+  // Sign-in-gated + daily-capped; aiFilled:false leaves the manual entry form.
+  const { userId } = await auth();
+  if (!userId) return { aiFilled: false };
+  const usage = await bumpAiUsage(userId, "classify");
+  if (!usage.ok) return { aiFilled: false };
 
   try {
     const res = await fetch(GROQ_URL, {

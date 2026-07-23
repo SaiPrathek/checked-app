@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { SignInButton } from "@clerk/nextjs";
 import { HOLD } from "@/lib/hold";
 import { searchHold } from "@/lib/guidance";
 import { useApp } from "@/lib/store";
@@ -15,7 +16,15 @@ const EXAMPLES = [
   "What documents must I pack?",
 ];
 
-type Status = "idle" | "streaming" | "done" | "nokey" | "error" | "nosources";
+type Status =
+  | "idle"
+  | "streaming"
+  | "done"
+  | "nokey"
+  | "signin"
+  | "limit"
+  | "error"
+  | "nosources";
 
 /** Render the model's inline [n] markers as small accent chips. */
 function withCitations(text: string) {
@@ -77,6 +86,14 @@ export default function TheTower() {
 
       if (res.status === 503) {
         setStatus("nokey"); // live answer unavailable — sources still shown
+        return;
+      }
+      if (res.status === 401) {
+        setStatus("signin"); // sign-in required for live answers — sources still shown
+        return;
+      }
+      if (res.status === 429) {
+        setStatus("limit"); // daily allowance reached — sources still shown
         return;
       }
       if (!res.ok || !res.body) {
@@ -191,6 +208,26 @@ export default function TheTower() {
                 <p className="m-0 rounded-[14px] border border-card-border bg-field p-3.5 text-[13px] leading-[1.5] text-ink-muted">
                   Live answers are paused right now — here&apos;s what The Hold
                   says directly.
+                </p>
+              )}
+              {status === "signin" && (
+                <div className="flex flex-col items-start gap-2.5 rounded-[14px] border border-card-border bg-field p-3.5 text-[13px] leading-[1.5] text-ink-muted">
+                  <span>
+                    Sign in to get a live, synthesized answer — the grounded
+                    sources are below either way.
+                  </span>
+                  <SignInButton mode="modal">
+                    <button className="h-9 rounded-[8px] bg-accent px-4 text-[13px] font-semibold text-accent-ink hover:brightness-[0.96]">
+                      Sign in to ask
+                    </button>
+                  </SignInButton>
+                </div>
+              )}
+              {status === "limit" && (
+                <p className="m-0 rounded-[14px] border border-card-border bg-field p-3.5 text-[13px] leading-[1.5] text-ink-muted">
+                  You&apos;ve reached today&apos;s live-answer limit — the
+                  grounded sources below still have you covered. Try again
+                  tomorrow.
                 </p>
               )}
               {status === "error" && (
