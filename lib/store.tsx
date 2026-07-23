@@ -128,6 +128,30 @@ function sanitizeActiveBags(v: unknown): BagId[] {
   return ordered.length ? ordered : [...DEFAULT_ACTIVE_BAGS];
 }
 
+/**
+ * Which account the local state belongs to. Lets sign-in tell apart
+ * "anonymous work by the person now signing in" (merge it up) from "a different
+ * user's leftover on a shared browser" (never merge — replace it). Unset =
+ * anonymous / legacy, which merges (preserves the primary funnel).
+ */
+const OWNER_KEY = "checked.owner.v0";
+function readOwner(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(OWNER_KEY);
+  } catch {
+    return null;
+  }
+}
+function writeOwner(id: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(OWNER_KEY, id);
+  } catch {
+    /* ignore */
+  }
+}
+
 function loadLocal(): Persisted {
   const empty: Persisted = {
     profile: {},
@@ -244,66 +268,108 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ]);
 
       const local = loadLocal();
-      const serverIsEmpty = !serverProfile && serverList.length === 0;
-      const localHasSomething =
-        Object.keys(local.profile ?? {}).length > 0 || local.list.length > 0;
 
-      if (serverIsEmpty && localHasSomething) {
-        if (Object.keys(local.profile).length > 0) {
-          await saveProfile(local.profile);
-          setProfileState(local.profile);
-        }
-        if (local.list.length > 0) {
-          await importList(
-            local.list.map((id) => ({
-              itemId: id,
-              qty: local.qty?.[id] ?? 1,
-              allocation: local.alloc?.[id] ?? {},
-            })),
-          );
-          setList(local.list);
-          setQtyState(local.qty ?? {});
-          setAllocState(local.alloc ?? {});
-        }
-        // migrate the local fleet up if the user customized it
-        if (serverBags === null && local.activeBags.join() !== DEFAULT_ACTIVE_BAGS.join()) {
-          await saveBagConfig(local.activeBags);
-          setActiveBagsState(local.activeBags);
-        }
-        // migrate local custom items up (server empty check: no server list migrates all)
-        if (local.customItems && local.customItems.length > 0) {
-          for (const ci of local.customItems) {
-            await serverSaveCustomItem(ci).catch((e) => console.error("saveCustomItem", e));
-          }
-          setCustomItemsState(local.customItems);
-        }
-        // migrate local checklist ticks up
-        const localChecked = Object.keys(local.checkedOff ?? {}).filter((k) => local.checkedOff?.[k]);
-        if (localChecked.length > 0) {
-          await serverSetChecklistChecks(localChecked, true).catch((e) =>
-            console.error("setChecklistChecks", e),
-          );
-          setCheckedOffState(local.checkedOff ?? {});
-        }
-      } else {
-        if (serverProfile) setProfileState(serverProfile);
-        if (serverList.length) {
-          setList(serverList.map((r) => r.itemId));
+      // Only merge local work up when it's anonymous (no owner recorded) or
+      // belongs to the user now signing in. If it's a *different* user's
+      // leftover on a shared browser, never merge — replace it with the
+      // signing-in user's server state so nothing leaks between accounts.
+      const owner = readOwner();
+      const canMerge = !owner || owner === user.id;
+
+      if (canMerge) {
+        // Merge per slice rather than all-or-nothing. Keep the server's value
+        // where it exists (durable record wins on conflict) and push any
+        // *local-only* additions up, so logged-out work is never dropped. The
+        // new-user case (empty server) falls out of this: everything is local-only.
+
+        // ---- LIST: union of item ids. importList() is onConflictDoNothing, so
+        //      it only inserts items the server doesn't already have. ----
+        const serverIds = new Set(serverList.map((r) => r.itemId));
+        const localOnly = local.list
+          .filter((id) => !serverIds.has(id))
+          .map((id) => ({
+            itemId: id,
+            qty: local.qty?.[id] ?? 1,
+            allocation: local.alloc?.[id] ?? {},
+          }));
+        if (localOnly.length > 0) await importList(localOnly);
+        const mergedList = [
+          ...serverList,
+          ...localOnly.map((e) => ({
+            itemId: e.itemId,
+            qty: Math.max(1, Math.floor(e.qty)),
+            allocation: e.allocation,
+          })),
+        ];
+        if (mergedList.length) {
+          setList(mergedList.map((r) => r.itemId));
           const q: Record<string, number> = {};
           const a: Record<string, Allocation> = {};
-          for (const r of serverList) {
+          for (const r of mergedList) {
             q[r.itemId] = r.qty;
             if (allocatedUnits(r.allocation) > 0) a[r.itemId] = r.allocation;
           }
           setQtyState(q);
           setAllocState(a);
         }
-        if (serverBags) setActiveBagsState(sanitizeActiveBags(serverBags));
-        if (serverCustom.length) setCustomItemsState(serverCustom);
-        if (serverChecked.length) {
-          setCheckedOffState(Object.fromEntries(serverChecked.map((k) => [k, true])));
+
+        // ---- PROFILE: server wins if present, else push local up. ----
+        if (serverProfile) {
+          setProfileState(serverProfile);
+        } else if (Object.keys(local.profile ?? {}).length > 0) {
+          await saveProfile(local.profile);
+          setProfileState(local.profile);
         }
+
+        // ---- BAGS: server wins if present, else push a customized local fleet up. ----
+        if (serverBags) {
+          setActiveBagsState(sanitizeActiveBags(serverBags));
+        } else if (local.activeBags.join() !== DEFAULT_ACTIVE_BAGS.join()) {
+          await saveBagConfig(local.activeBags);
+          setActiveBagsState(local.activeBags);
+        }
+
+        // ---- CUSTOM ITEMS: union by id; push local-only up. ----
+        const serverCustomIds = new Set(serverCustom.map((c) => c.id));
+        const localOnlyCustom = (local.customItems ?? []).filter((c) => !serverCustomIds.has(c.id));
+        for (const ci of localOnlyCustom) {
+          await serverSaveCustomItem(ci).catch((e) => console.error("saveCustomItem", e));
+        }
+        const mergedCustom = [...serverCustom, ...localOnlyCustom];
+        if (mergedCustom.length) setCustomItemsState(mergedCustom);
+
+        // ---- CHECKLIST TICKS: union; push local-only ticks up. ----
+        const serverCheckedSet = new Set(serverChecked);
+        const localChecked = Object.keys(local.checkedOff ?? {}).filter((k) => local.checkedOff?.[k]);
+        const localOnlyChecked = localChecked.filter((k) => !serverCheckedSet.has(k));
+        if (localOnlyChecked.length > 0) {
+          await serverSetChecklistChecks(localOnlyChecked, true).catch((e) =>
+            console.error("setChecklistChecks", e),
+          );
+        }
+        const mergedChecked = [...new Set([...serverChecked, ...localChecked])];
+        if (mergedChecked.length) {
+          setCheckedOffState(Object.fromEntries(mergedChecked.map((k) => [k, true])));
+        }
+      } else {
+        // Different account's data on this browser — replace every slice with
+        // this user's server state (including empties) so no stale data lingers.
+        setProfileState(serverProfile ?? {});
+        setList(serverList.map((r) => r.itemId));
+        const q: Record<string, number> = {};
+        const a: Record<string, Allocation> = {};
+        for (const r of serverList) {
+          q[r.itemId] = r.qty;
+          if (allocatedUnits(r.allocation) > 0) a[r.itemId] = r.allocation;
+        }
+        setQtyState(q);
+        setAllocState(a);
+        setActiveBagsState(serverBags ? sanitizeActiveBags(serverBags) : [...DEFAULT_ACTIVE_BAGS]);
+        setCustomItemsState(serverCustom);
+        setCheckedOffState(Object.fromEntries(serverChecked.map((k) => [k, true])));
       }
+
+      writeOwner(user.id);
       setServerSynced(true);
     })().catch((e) => console.error("[Checked] server sync failed", e));
   }, [hydrated, isLoaded, isSignedIn, user]);
