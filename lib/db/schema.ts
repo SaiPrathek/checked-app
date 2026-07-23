@@ -134,6 +134,19 @@ export const aiUsage = pgTable(
 );
 
 /**
+ * events — lightweight product analytics (affiliate clicks, key funnel steps).
+ * First-party, stored in our own DB; complements Vercel Analytics pageviews.
+ * `userId` is nullable (anonymous events allowed); `meta` is free-form JSON.
+ */
+export const events = pgTable("events", {
+  id: text("id").primaryKey(), // crypto.randomUUID()
+  userId: text("user_id"), // nullable — no FK so anonymous events never fail
+  name: text("name").notNull(), // e.g. "affiliate_click"
+  meta: jsonb("meta"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
  * ─────────────────────────────────────────────────────────────
  * The Hold (corpus) mirrored into DB so we can query verdicts by
  * SQL and later aggregate community stats from debrief_responses.

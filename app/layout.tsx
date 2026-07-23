@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { AppProvider } from "@/lib/store";
 import { Nav } from "@/components/nav";
@@ -102,6 +103,7 @@ export default function RootLayout({
             </footer>
             <SyncBanner />
           </AppProvider>
+          <Analytics />
         </body>
       </html>
     </ClerkProvider>
