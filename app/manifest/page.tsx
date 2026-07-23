@@ -18,6 +18,7 @@ import { ImportPanel } from "@/components/manifest/import-panel";
 import { JourneyNav } from "@/components/journey-nav";
 import { ItemIcon } from "@/components/item-icon";
 import { VerdictBadge } from "@/components/ui/verdict-badge";
+import { BuyCta } from "@/components/ui/buy-cta";
 import { CommunityStat } from "@/components/ui/community-stat";
 import { QtyStepper } from "@/components/ui/qty-stepper";
 import { getCommunityStats } from "@/lib/actions/debrief";
@@ -663,6 +664,9 @@ function ManifestRow({
         <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
           <VerdictBadge verdict={guidance.verdict} contested={hold?.contested ?? false} />
           <CommunityStat stat={stat} />
+          {guidance.verdict === "buy-in-us" && hold?.price?.buyUrl && (
+            <BuyCta url={hold.price.buyUrl} item={hold.item} label={hold.price.buyLabel} />
+          )}
           {onRemove && (
             <button
               type="button"

@@ -42,7 +42,15 @@ export interface HoldItem {
     beverage?: Record<string, string>;
     gender?: Record<string, string>;
   };
-  price?: { inr?: number | null; usd?: number | null; note?: string } | null;
+  price?: {
+    inr?: number | null;
+    usd?: number | null;
+    note?: string;
+    /** Where to buy it in the US. Affiliate link when a program tag is set;
+     * a plain product/search URL otherwise. Drives the "Buy in the US" CTA. */
+    buyUrl?: string | null;
+    buyLabel?: string | null;
+  } | null;
   weightNote?: string | null;
   communityStats?: unknown;
 }

@@ -97,8 +97,9 @@ export default function RootLayout({
                 Checked · checked.co.in · v0 · verdicts sourced from The Hold — corpus/README.md
               </span>
               <span className="max-w-[560px] normal-case tracking-normal text-[10.5px] text-[#a79e8b]">
-                Every verdict reflects community data and item facts alone — never
-                affiliate commissions or sponsorships.
+                Some &ldquo;buy in the US&rdquo; links may earn us a commission —
+                verdicts reflect community data and item facts alone, and
+                commissions never influence them.
               </span>
             </footer>
             <SyncBanner />

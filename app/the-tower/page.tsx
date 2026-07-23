@@ -8,6 +8,7 @@ import { searchHold } from "@/lib/guidance";
 import { useApp } from "@/lib/store";
 import type { HoldItem } from "@/lib/types";
 import { VerdictBadge } from "@/components/ui/verdict-badge";
+import { BuyCta } from "@/components/ui/buy-cta";
 
 const EXAMPLES = [
   "Should I bring a pressure cooker?",
@@ -266,6 +267,11 @@ export default function TheTower() {
                           ? ` · ${h.claimIds.length} source${h.claimIds.length > 1 ? "s" : ""} in The Hold`
                           : ""}
                       </p>
+                      {h.verdict === "buy-in-us" && h.price?.buyUrl && (
+                        <div className="mt-0.5">
+                          <BuyCta url={h.price.buyUrl} item={h.item} label={h.price.buyLabel} />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
