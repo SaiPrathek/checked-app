@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   },
   applicationName: "Checked",
   description:
-    "A relocation copilot for Indian students moving to the US. Personalized packing verdicts, a live luggage weigher, and community-backed guidance. Everything, checked.",
+    "A relocation copilot for Indian students moving to the US — personalized packing verdicts, a live luggage weigher, and community-backed guidance.",
   alternates: { canonical: "/" },
   keywords: [
     "packing list for US",
@@ -48,7 +48,8 @@ export const metadata: Metadata = {
     url: "/",
     siteName: "Checked",
     title: "Checked — Everything, checked.",
-    description: "Pack smarter for your move from India to the US.",
+    description:
+      "Pack smarter for your move from India to the US: bring-vs-buy verdicts, a live luggage weigher, and community-backed guidance.",
     images: [
       {
         url: "/brand/checked-social.png",
@@ -61,7 +62,8 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Checked — Everything, checked.",
-    description: "Pack smarter for your move from India to the US.",
+    description:
+      "Pack smarter for your move from India to the US: bring-vs-buy verdicts, a live luggage weigher, and community-backed guidance.",
     images: ["/brand/checked-social.png"],
   },
 };
