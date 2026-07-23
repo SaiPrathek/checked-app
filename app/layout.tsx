@@ -104,6 +104,10 @@ export default function RootLayout({
                 commissions never influence them.
               </span>
               <nav className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 normal-case tracking-normal text-[10.5px]">
+                <Link href="/guides" className="text-[#a79e8b] hover:text-primary">
+                  Guides
+                </Link>
+                <span aria-hidden className="text-[#d8cdb8]">·</span>
                 <Link href="/privacy" className="text-[#a79e8b] hover:text-primary">
                   Privacy
                 </Link>
