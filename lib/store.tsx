@@ -62,6 +62,10 @@ interface AppState {
   hydrated: boolean;
   /** true when we've loaded state from the server (signed-in users only) */
   serverSynced: boolean;
+  /** true when a background save/sync to the server failed (signed-in users) */
+  syncError: boolean;
+  /** dismiss the sync-error banner */
+  dismissSyncError: () => void;
 
   setProfile: (p: Profile) => void;
   toggleListItem: (id: string) => void;
@@ -230,9 +234,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [checkedOff, setCheckedOffState] = useState<Record<string, boolean>>({});
   const [hydrated, setHydrated] = useState(false);
   const [serverSynced, setServerSynced] = useState(false);
+  const [syncError, setSyncError] = useState(false);
 
   const hydratedForUser = useRef<string | null>(null);
   const profileSaveQueue = useRef<Promise<void>>(Promise.resolve());
+
+  // Shared rejection handler for the fire-and-forget server writes below: log it
+  // and raise the sync-error flag so the UI can tell the user their change may
+  // not have been saved (local state + localStorage still hold it).
+  const onSyncFail = useCallback(
+    (label: string) => (e: unknown) => {
+      console.error(label, e);
+      setSyncError(true);
+    },
+    [],
+  );
 
   // 1) initial hydrate from localStorage
   useEffect(() => {
@@ -333,7 +349,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const serverCustomIds = new Set(serverCustom.map((c) => c.id));
         const localOnlyCustom = (local.customItems ?? []).filter((c) => !serverCustomIds.has(c.id));
         for (const ci of localOnlyCustom) {
-          await serverSaveCustomItem(ci).catch((e) => console.error("saveCustomItem", e));
+          await serverSaveCustomItem(ci).catch(onSyncFail("saveCustomItem"));
         }
         const mergedCustom = [...serverCustom, ...localOnlyCustom];
         if (mergedCustom.length) setCustomItemsState(mergedCustom);
@@ -343,8 +359,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const localChecked = Object.keys(local.checkedOff ?? {}).filter((k) => local.checkedOff?.[k]);
         const localOnlyChecked = localChecked.filter((k) => !serverCheckedSet.has(k));
         if (localOnlyChecked.length > 0) {
-          await serverSetChecklistChecks(localOnlyChecked, true).catch((e) =>
-            console.error("setChecklistChecks", e),
+          await serverSetChecklistChecks(localOnlyChecked, true).catch(
+            onSyncFail("setChecklistChecks"),
           );
         }
         const mergedChecked = [...new Set([...serverChecked, ...localChecked])];
@@ -371,7 +387,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       writeOwner(user.id);
       setServerSynced(true);
-    })().catch((e) => console.error("[Checked] server sync failed", e));
+    })().catch((e) => {
+      console.error("[Checked] server sync failed", e);
+      setSyncError(true);
+    });
   }, [hydrated, isLoaded, isSignedIn, user]);
 
   // 3) persist to localStorage
@@ -411,7 +430,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         profileSaveQueue.current = profileSaveQueue.current
           .catch(() => undefined)
           .then(() => saveProfile(p))
-          .catch((e) => console.error("saveProfile", e));
+          .catch(onSyncFail("saveProfile"));
       }
     },
     [isSignedIn, list, profile],
@@ -447,10 +466,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setList((cur) => [...cur, id]);
         setQtyState((cur) => ({ ...cur, [id]: initial }));
         if (isSignedIn)
-          serverToggle(id, initial).catch((e) => console.error("toggle", e));
+          serverToggle(id, initial).catch(onSyncFail("toggle"));
         return;
       }
-      if (isSignedIn) serverToggle(id).catch((e) => console.error("toggle", e));
+      if (isSignedIn) serverToggle(id).catch(onSyncFail("toggle"));
     },
     [isSignedIn, list, profile],
   );
@@ -480,7 +499,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return { ...cur, [id]: clampAlloc(a, clean) };
         });
       }
-      if (isSignedIn) serverSetQty(id, clean).catch((e) => console.error("setQty", e));
+      if (isSignedIn) serverSetQty(id, clean).catch(onSyncFail("setQty"));
     },
     [isSignedIn],
   );
@@ -488,7 +507,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const pushAllocation = useCallback(
     (id: string, a: Allocation) => {
       if (isSignedIn)
-        serverSetAllocation(id, a).catch((e) => console.error("setAllocation", e));
+        serverSetAllocation(id, a).catch(onSyncFail("setAllocation"));
     },
     [isSignedIn],
   );
@@ -527,7 +546,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             itemId,
             allocation,
           })),
-        ).catch((e) => console.error("setAllocations", e));
+        ).catch(onSyncFail("setAllocations"));
       }
     },
     [isSignedIn],
@@ -553,12 +572,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
                   itemId,
                   allocation,
                 })),
-              ).catch((e) => console.error("setAllocations", e));
+              ).catch(onSyncFail("setAllocations"));
             }
             return stripped;
           });
         }
-        if (isSignedIn) saveBagConfig(next).catch((e) => console.error("saveBagConfig", e));
+        if (isSignedIn) saveBagConfig(next).catch(onSyncFail("saveBagConfig"));
         return next;
       });
     },
@@ -576,7 +595,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         return [...cur, item];
       });
-      if (isSignedIn) serverSaveCustomItem(item).catch((e) => console.error("saveCustomItem", e));
+      if (isSignedIn) serverSaveCustomItem(item).catch(onSyncFail("saveCustomItem"));
     },
     [isSignedIn],
   );
@@ -596,7 +615,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         delete next[id];
         return next;
       });
-      if (isSignedIn) serverDeleteCustomItem(id).catch((e) => console.error("deleteCustomItem", e));
+      if (isSignedIn) serverDeleteCustomItem(id).catch(onSyncFail("deleteCustomItem"));
     },
     [isSignedIn],
   );
@@ -618,7 +637,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return next;
       });
       if (isSignedIn)
-        serverSetChecklistCheck(key, checked).catch((e) => console.error("setChecklistCheck", e));
+        serverSetChecklistCheck(key, checked).catch(onSyncFail("setChecklistCheck"));
     },
     [isSignedIn],
   );
@@ -634,7 +653,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return next;
       });
       if (isSignedIn)
-        serverSetChecklistChecks(keys, checked).catch((e) => console.error("setChecklistChecks", e));
+        serverSetChecklistChecks(keys, checked).catch(onSyncFail("setChecklistChecks"));
     },
     [isSignedIn],
   );
@@ -649,6 +668,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     checkedOff,
     hydrated,
     serverSynced,
+    syncError,
+    dismissSyncError: () => setSyncError(false),
     setProfile,
     toggleListItem,
     isListed: (id) => list.includes(id),

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import { useApp } from "@/lib/store";
 import {
   BAG_CATALOG,
@@ -116,7 +117,9 @@ export default function WeighIn() {
     setBagActive,
     getPackable,
     hydrated,
+    serverSynced,
   } = useApp();
+  const { isSignedIn } = useUser();
   const [view, setView] = useState<"case" | "classic">("case");
   const [activeBagTab, setActiveBagTab] = useState<BagId>("bag1");
   const [bagConfig, setBagConfig] = useState<Record<BagId, BagConfig>>(DEFAULT_CONFIG);
@@ -166,7 +169,9 @@ export default function WeighIn() {
     return { perBag, tray, violations, totalPackedKg };
   }, [items, alloc, qtyFor, activeBags]);
 
-  if (!hydrated) {
+  // Wait for the server pull too when signed in, so we don't flash the empty
+  // state before the user's saved list/allocations arrive.
+  if (!hydrated || (isSignedIn && !serverSynced)) {
     return <p className="font-mono text-xs text-mono-muted">LOADING…</p>;
   }
 

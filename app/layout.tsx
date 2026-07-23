@@ -5,6 +5,7 @@ import "./globals.css";
 import { AppProvider } from "@/lib/store";
 import { Nav } from "@/components/nav";
 import { LogoMark } from "@/components/logo";
+import { SyncBanner } from "@/components/sync-banner";
 
 const display = Space_Grotesk({
   subsets: ["latin"],
@@ -89,10 +90,17 @@ export default function RootLayout({
             <main className="mx-auto max-w-[1120px] px-5 pb-20 pt-7">
               {children}
             </main>
-            <footer className="mx-auto flex max-w-[1120px] items-center justify-center gap-2 px-5 py-8 text-center font-mono text-[10px] uppercase tracking-[0.16em] text-mono-muted">
-              <LogoMark className="h-5 w-5 flex-shrink-0" />
-              <span>Checked · checked.co.in · v0 · verdicts sourced from The Hold — corpus/README.md</span>
+            <footer className="mx-auto flex max-w-[1120px] flex-col items-center justify-center gap-2 px-5 py-8 text-center font-mono text-[10px] uppercase tracking-[0.16em] text-mono-muted">
+              <span className="flex items-center gap-2">
+                <LogoMark className="h-5 w-5 flex-shrink-0" />
+                Checked · checked.co.in · v0 · verdicts sourced from The Hold — corpus/README.md
+              </span>
+              <span className="max-w-[560px] normal-case tracking-normal text-[10.5px] text-[#a79e8b]">
+                Every verdict reflects community data and item facts alone — never
+                affiliate commissions or sponsorships.
+              </span>
             </footer>
+            <SyncBanner />
           </AppProvider>
         </body>
       </html>

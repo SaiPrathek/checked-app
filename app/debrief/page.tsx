@@ -56,11 +56,12 @@ const VERDICT_STYLE: Record<DebriefVerdict, string> = {
 
 export default function Debrief() {
   const { isLoaded, isSignedIn } = useUser();
-  const { list, hydrated } = useApp();
+  const { list, hydrated, serverSynced } = useApp();
 
   const [myDebriefs, setMyDebriefs] = useState<Record<string, DebriefVerdict>>({});
   const [pending, setPending] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -96,6 +97,7 @@ export default function Debrief() {
 
   async function vote(holdKey: string, verdict: DebriefVerdict) {
     setPending(holdKey);
+    setActionError(null);
     const note = notes[holdKey]?.trim() || undefined;
     // optimistic
     setMyDebriefs((cur) => ({ ...cur, [holdKey]: verdict }));
@@ -103,11 +105,13 @@ export default function Debrief() {
       await submitDebrief(holdKey, verdict, note);
     } catch (e) {
       console.error("submitDebrief", e);
+      // roll back the optimistic vote and tell the user it didn't stick
       setMyDebriefs((cur) => {
         const next = { ...cur };
         delete next[holdKey];
         return next;
       });
+      setActionError("Couldn't save your rating — check your connection and try again.");
     } finally {
       setPending(null);
     }
@@ -115,6 +119,8 @@ export default function Debrief() {
 
   async function undo(holdKey: string) {
     setPending(holdKey);
+    setActionError(null);
+    const prev = myDebriefs[holdKey];
     setMyDebriefs((cur) => {
       const next = { ...cur };
       delete next[holdKey];
@@ -124,12 +130,15 @@ export default function Debrief() {
       await deleteDebrief(holdKey);
     } catch (e) {
       console.error("deleteDebrief", e);
+      // restore the vote we optimistically removed
+      if (prev) setMyDebriefs((cur) => ({ ...cur, [holdKey]: prev }));
+      setActionError("Couldn't undo your rating — try again in a moment.");
     } finally {
       setPending(null);
     }
   }
 
-  if (!hydrated || !isLoaded) {
+  if (!hydrated || !isLoaded || (isSignedIn && !serverSynced)) {
     return <p className="font-mono text-xs text-mono-muted">LOADING…</p>;
   }
 
@@ -147,6 +156,16 @@ export default function Debrief() {
           feeds The Hold and helps the next cohort pack smarter.
         </p>
       </div>
+
+      {actionError && (
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-[12px] border border-[#f2c9c2] bg-[#fbe8e5] px-4 py-3 text-[13px] leading-[1.5] text-[#7a2019]"
+        >
+          <span className="mt-px text-[#b23127]">⚠</span>
+          <span className="flex-1">{actionError}</span>
+        </div>
+      )}
 
       {!isSignedIn ? (
         <div className="rounded-2xl border border-card-border bg-card p-6 text-center shadow-[0_18px_34px_-28px_rgba(20,26,38,0.5)]">

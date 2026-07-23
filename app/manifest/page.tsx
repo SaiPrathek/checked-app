@@ -123,6 +123,7 @@ export default function Manifest() {
     toggleListItem,
     isListed,
     hydrated,
+    serverSynced,
     qtyFor,
     setQtyForItem,
     customItems,
@@ -211,7 +212,9 @@ export default function Manifest() {
       .catch((e) => console.error("getCommunityStats", e));
   }, []);
 
-  if (!hydrated)
+  // Wait for the server pull too when signed in, so we never flash general
+  // verdicts / an empty list before the user's saved state arrives.
+  if (!hydrated || (isSignedIn && !serverSynced))
     return <p className="font-mono text-xs text-mono-muted">LOADING…</p>;
 
   return (
@@ -792,10 +795,12 @@ function AddCustomForm({
   const [note, setNote] = useState("");
   const [aiFilled, setAiFilled] = useState(false);
   const [classifying, setClassifying] = useState(false);
+  const [aiError, setAiError] = useState(false);
 
   async function askCheckedAI() {
     if (!name.trim()) return;
     setClassifying(true);
+    setAiError(false);
     try {
       const r = await classifyCustomItem(name.trim());
       if (r.name) setName(r.name);
@@ -804,8 +809,12 @@ function AddCustomForm({
       if (r.verdict) setVerdict(r.verdict);
       if (r.note) setNote(r.note);
       setAiFilled(r.aiFilled);
+      // aiFilled:false means the key is missing or the call failed/timed out —
+      // tell the user rather than silently leaving the fields at defaults.
+      if (!r.aiFilled) setAiError(true);
     } catch (e) {
       console.error("classifyCustomItem", e);
+      setAiError(true);
     } finally {
       setClassifying(false);
     }
@@ -850,6 +859,13 @@ function AddCustomForm({
           {classifying ? "Asking Checked AI…" : "✦ Ask Checked AI to fill this in"}
         </button>
       </div>
+
+      {aiError && (
+        <p className="m-0 text-[12px] leading-[1.45] text-[#b23127]">
+          Couldn&apos;t auto-fill this one just now — enter the details below by
+          hand, or try again in a moment.
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-3">
         <label className="flex flex-col gap-1">
