@@ -402,7 +402,9 @@
         "c061"
       ],
       "context": {},
-      "price": null,
+      "price": {
+        "buyUrl": "https://www.amazon.com/s?k=small+kitchen+appliances"
+      },
       "weightNote": "transformers are heavy — not worth it",
       "communityStats": null
     },
@@ -424,7 +426,8 @@
       "price": {
         "usd": 999,
         "inr": 99900,
-        "note": "iPhone example; electronics broadly cheaper in US"
+        "note": "iPhone example; electronics broadly cheaper in US",
+        "buyUrl": "https://www.amazon.com/s?k=laptop+accessories"
       },
       "weightNote": null,
       "communityStats": null
