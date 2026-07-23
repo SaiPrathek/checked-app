@@ -44,6 +44,7 @@ import {
   setChecklistCheck as serverSetChecklistCheck,
   setChecklistChecks as serverSetChecklistChecks,
 } from "./actions/checklist";
+import { planSync, sanitizeActiveBags } from "./sync";
 
 interface AppState {
   profile: Profile;
@@ -126,11 +127,6 @@ function migrateAlloc(parsed: {
   return out;
 }
 
-function sanitizeActiveBags(v: unknown): BagId[] {
-  if (!Array.isArray(v) || v.length === 0) return [...DEFAULT_ACTIVE_BAGS];
-  const ordered = orderBags(v as BagId[]);
-  return ordered.length ? ordered : [...DEFAULT_ACTIVE_BAGS];
-}
 
 /**
  * Which account the local state belongs to. Lets sign-in tell apart
@@ -283,106 +279,51 @@ export function AppProvider({ children }: { children: ReactNode }) {
         getMyChecklist(),
       ]);
 
-      const local = loadLocal();
+      // Decide the merge with the pure planner (see lib/sync.ts; unit-tested in
+      // scripts/test-sync.ts). It reconciles local + server given the owner tag:
+      // merge local-only additions up when the data is anonymous or ours, or
+      // replace with server state when it belongs to a different account.
+      const plan = planSync(
+        loadLocal(),
+        {
+          profile: serverProfile,
+          list: serverList,
+          bags: serverBags,
+          custom: serverCustom,
+          checked: serverChecked,
+        },
+        readOwner(),
+        user.id,
+      );
 
-      // Only merge local work up when it's anonymous (no owner recorded) or
-      // belongs to the user now signing in. If it's a *different* user's
-      // leftover on a shared browser, never merge — replace it with the
-      // signing-in user's server state so nothing leaks between accounts.
-      const owner = readOwner();
-      const canMerge = !owner || owner === user.id;
+      // Apply the resulting in-memory state immediately.
+      setProfileState(plan.state.profile);
+      setList(plan.state.list);
+      setQtyState(plan.state.qty);
+      setAllocState(plan.state.alloc);
+      setActiveBagsState(plan.state.activeBags);
+      setCustomItemsState(plan.state.customItems);
+      setCheckedOffState(plan.state.checkedOff);
 
-      if (canMerge) {
-        // Merge per slice rather than all-or-nothing. Keep the server's value
-        // where it exists (durable record wins on conflict) and push any
-        // *local-only* additions up, so logged-out work is never dropped. The
-        // new-user case (empty server) falls out of this: everything is local-only.
-
-        // ---- LIST: union of item ids. importList() is onConflictDoNothing, so
-        //      it only inserts items the server doesn't already have. ----
-        const serverIds = new Set(serverList.map((r) => r.itemId));
-        const localOnly = local.list
-          .filter((id) => !serverIds.has(id))
-          .map((id) => ({
-            itemId: id,
-            qty: local.qty?.[id] ?? 1,
-            allocation: local.alloc?.[id] ?? {},
-          }));
-        if (localOnly.length > 0) await importList(localOnly);
-        const mergedList = [
-          ...serverList,
-          ...localOnly.map((e) => ({
-            itemId: e.itemId,
-            qty: Math.max(1, Math.floor(e.qty)),
-            allocation: e.allocation,
-          })),
-        ];
-        if (mergedList.length) {
-          setList(mergedList.map((r) => r.itemId));
-          const q: Record<string, number> = {};
-          const a: Record<string, Allocation> = {};
-          for (const r of mergedList) {
-            q[r.itemId] = r.qty;
-            if (allocatedUnits(r.allocation) > 0) a[r.itemId] = r.allocation;
-          }
-          setQtyState(q);
-          setAllocState(a);
-        }
-
-        // ---- PROFILE: server wins if present, else push local up. ----
-        if (serverProfile) {
-          setProfileState(serverProfile);
-        } else if (Object.keys(local.profile ?? {}).length > 0) {
-          await saveProfile(local.profile);
-          setProfileState(local.profile);
-        }
-
-        // ---- BAGS: server wins if present, else push a customized local fleet up. ----
-        if (serverBags) {
-          setActiveBagsState(sanitizeActiveBags(serverBags));
-        } else if (local.activeBags.join() !== DEFAULT_ACTIVE_BAGS.join()) {
-          await saveBagConfig(local.activeBags);
-          setActiveBagsState(local.activeBags);
-        }
-
-        // ---- CUSTOM ITEMS: union by id; push local-only up. ----
-        const serverCustomIds = new Set(serverCustom.map((c) => c.id));
-        const localOnlyCustom = (local.customItems ?? []).filter((c) => !serverCustomIds.has(c.id));
-        for (const ci of localOnlyCustom) {
-          await serverSaveCustomItem(ci).catch(onSyncFail("saveCustomItem"));
-        }
-        const mergedCustom = [...serverCustom, ...localOnlyCustom];
-        if (mergedCustom.length) setCustomItemsState(mergedCustom);
-
-        // ---- CHECKLIST TICKS: union; push local-only ticks up. ----
-        const serverCheckedSet = new Set(serverChecked);
-        const localChecked = Object.keys(local.checkedOff ?? {}).filter((k) => local.checkedOff?.[k]);
-        const localOnlyChecked = localChecked.filter((k) => !serverCheckedSet.has(k));
-        if (localOnlyChecked.length > 0) {
-          await serverSetChecklistChecks(localOnlyChecked, true).catch(
-            onSyncFail("setChecklistChecks"),
-          );
-        }
-        const mergedChecked = [...new Set([...serverChecked, ...localChecked])];
-        if (mergedChecked.length) {
-          setCheckedOffState(Object.fromEntries(mergedChecked.map((k) => [k, true])));
-        }
-      } else {
-        // Different account's data on this browser — replace every slice with
-        // this user's server state (including empties) so no stale data lingers.
-        setProfileState(serverProfile ?? {});
-        setList(serverList.map((r) => r.itemId));
-        const q: Record<string, number> = {};
-        const a: Record<string, Allocation> = {};
-        for (const r of serverList) {
-          q[r.itemId] = r.qty;
-          if (allocatedUnits(r.allocation) > 0) a[r.itemId] = r.allocation;
-        }
-        setQtyState(q);
-        setAllocState(a);
-        setActiveBagsState(serverBags ? sanitizeActiveBags(serverBags) : [...DEFAULT_ACTIVE_BAGS]);
-        setCustomItemsState(serverCustom);
-        setCheckedOffState(Object.fromEntries(serverChecked.map((k) => [k, true])));
+      // Push local-only additions up (no-ops in the replace case). Each is
+      // independent — one failure surfaces the sync-error banner but doesn't
+      // block the others.
+      if (plan.push.listItems.length) {
+        await importList(plan.push.listItems).catch(onSyncFail("importList"));
+      }
+      if (plan.push.profile) {
+        await saveProfile(plan.push.profile).catch(onSyncFail("saveProfile"));
+      }
+      if (plan.push.bags) {
+        await saveBagConfig(plan.push.bags).catch(onSyncFail("saveBagConfig"));
+      }
+      for (const ci of plan.push.customItems) {
+        await serverSaveCustomItem(ci).catch(onSyncFail("saveCustomItem"));
+      }
+      if (plan.push.checkedKeys.length) {
+        await serverSetChecklistChecks(plan.push.checkedKeys, true).catch(
+          onSyncFail("setChecklistChecks"),
+        );
       }
 
       writeOwner(user.id);
