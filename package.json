@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx scripts/test-loadsheet.ts && tsx scripts/test-sync.ts",
+    "test": "tsx scripts/test-loadsheet.ts && tsx scripts/test-sync.ts && tsx scripts/test-import.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx scripts/seed.ts"

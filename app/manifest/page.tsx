@@ -13,6 +13,8 @@ import type { Category, CustomItem, PackingItem, Profile, Verdict } from "@/lib/
 import { isCustomItemId } from "@/lib/types";
 import { CHECKLIST, checklistFor, checklistProgress, type ChecklistRow } from "@/lib/checklist";
 import { classifyCustomItem } from "@/lib/actions/claude";
+import { CATEGORY_LABEL } from "@/lib/labels";
+import { ImportPanel } from "@/components/manifest/import-panel";
 import { ItemIcon } from "@/components/item-icon";
 import { VerdictBadge } from "@/components/ui/verdict-badge";
 import { CommunityStat } from "@/components/ui/community-stat";
@@ -102,19 +104,6 @@ const CATEGORY_ORDER: Category[] = [
   "money",
 ];
 
-const CATEGORY_LABEL: Record<Category, string> = {
-  documents: "Documents",
-  medicines: "Medicines & health",
-  clothing: "Clothing",
-  bedding: "Bedding",
-  kitchen: "Kitchen",
-  food: "Food",
-  toiletries: "Toiletries & supplies",
-  electronics: "Electronics",
-  stationery: "Stationery",
-  misc: "Miscellaneous",
-  money: "Money",
-};
 
 export default function Manifest() {
   const {
@@ -141,6 +130,7 @@ export default function Manifest() {
   const [stats, setStats] = useState<Map<string, Stat>>(new Map());
   const [view, setView] = useState<"cards" | "checklist">("cards");
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const tour = useTourController("manifest", { canAutoStart: hydrated });
 
   const visibleItems = useMemo(
@@ -399,10 +389,18 @@ export default function Manifest() {
                 <button
                   type="button"
                   data-tour="manifest-add-item"
-                  onClick={() => setAdding((v) => !v)}
+                  onClick={() => { setAdding((v) => !v); setImporting(false); }}
                   className="rounded-full border border-field-border bg-card px-2.5 py-1 font-mono text-[10.5px] font-bold uppercase tracking-[0.12em] text-ink-muted transition-colors hover:border-primary hover:text-primary"
                 >
                   {adding ? "Close" : "+ Add item"}
+                </button>
+                <button
+                  type="button"
+                  data-tour="manifest-import"
+                  onClick={() => { setImporting((v) => !v); setAdding(false); }}
+                  className="rounded-full border border-field-border bg-card px-2.5 py-1 font-mono text-[10.5px] font-bold uppercase tracking-[0.12em] text-ink-muted transition-colors hover:border-primary hover:text-primary"
+                >
+                  {importing ? "Close" : "⇪ Import list"}
                 </button>
                 {activeItems.length > 0 && (() => {
                   const unlisted = activeItems.filter((it) => !isListed(it.id));
@@ -454,6 +452,7 @@ export default function Manifest() {
               }}
             />
           )}
+          {importing && <ImportPanel onClose={() => setImporting(false)} />}
           {activeItems.map((it, idx) => (
             <ManifestRow
               key={it.id}
