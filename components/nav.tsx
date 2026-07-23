@@ -2,17 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { LogoMark } from "@/components/logo";
 
-const LINKS = [
-  { href: "/check-in", label: "Check-In" },
-  { href: "/manifest", label: "The Manifest" },
-  { href: "/weigh-in", label: "Weigh-In" },
-  { href: "/the-tower", label: "The Tower" },
-  { href: "/debrief", label: "Debrief" },
-];
+// The three linear packing steps collapse into one "Packing" nav entry that
+// resumes wherever the user last was. Tower & Debrief stay standalone.
+const JOURNEY = ["/check-in", "/manifest", "/weigh-in"];
+const JOURNEY_KEY = "checked.journey.last.v1";
 
 const TICKER = [
   "TERMINAL 1 · INTL DEPARTURES",
@@ -23,6 +21,34 @@ const TICKER = [
 export function Nav() {
   const pathname = usePathname();
   const { isLoaded, isSignedIn } = useUser();
+
+  // Remember the last journey step visited so the combined "Packing" link resumes there.
+  const [lastJourney, setLastJourney] = useState("/check-in");
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(JOURNEY_KEY);
+      if (saved && JOURNEY.includes(saved)) setLastJourney(saved);
+    } catch {
+      /* private mode / SSR — fall back to the default step */
+    }
+  }, []);
+  useEffect(() => {
+    if (JOURNEY.includes(pathname)) {
+      setLastJourney(pathname);
+      try {
+        localStorage.setItem(JOURNEY_KEY, pathname);
+      } catch {
+        /* ignore — resume defaults to Check-In */
+      }
+    }
+  }, [pathname]);
+
+  const links = [
+    { href: lastJourney, label: "Packing", match: JOURNEY },
+    { href: "/the-tower", label: "The Tower", match: ["/the-tower"] },
+    { href: "/debrief", label: "Debrief", match: ["/debrief"] },
+  ];
+
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-nav-border bg-nav">
@@ -38,11 +64,11 @@ export function Nav() {
           </Link>
           <div className="flex items-center gap-3">
             <nav className="hidden flex-wrap justify-end gap-0.5 sm:flex">
-              {LINKS.map((l) => {
-                const active = pathname === l.href;
+              {links.map((l) => {
+                const active = l.match.includes(pathname);
                 return (
                   <Link
-                    key={l.href}
+                    key={l.label}
                     href={l.href}
                     className={cn(
                       "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
@@ -76,11 +102,11 @@ export function Nav() {
           </div>
         </div>
         <nav className="flex items-center justify-between gap-1 overflow-x-auto border-t border-nav-border px-3 py-1.5 sm:hidden">
-          {LINKS.map((l) => {
-            const active = pathname === l.href;
+          {links.map((l) => {
+            const active = l.match.includes(pathname);
             return (
               <Link
-                key={l.href}
+                key={l.label}
                 href={l.href}
                 className={cn(
                   "flex-shrink-0 rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors",
