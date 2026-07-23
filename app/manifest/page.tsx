@@ -51,6 +51,12 @@ const STEPS_MANIFEST: TourStep[] = [
     placement: "bottom",
   },
   {
+    anchor: "manifest-import",
+    title: "Already have a list?",
+    body: "Paste a list you've made — or a CSV/Excel export — of what you've packed with counts, and Checked AI matches each line to your Manifest. Review before it's added.",
+    placement: "bottom",
+  },
+  {
     anchor: "manifest-select-all",
     title: "Select all at once",
     body: "Add or clear every item in this category in one tap, then fine-tune from there.",
