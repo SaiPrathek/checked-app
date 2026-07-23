@@ -664,9 +664,15 @@ function ManifestRow({
         <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
           <VerdictBadge verdict={guidance.verdict} contested={hold?.contested ?? false} />
           <CommunityStat stat={stat} />
-          {guidance.verdict === "buy-in-us" && hold?.price?.buyUrl && (
-            <BuyCta url={hold.price.buyUrl} item={hold.item} label={hold.price.buyLabel} />
-          )}
+          {hold?.price?.buyUrl &&
+            (guidance.verdict === "buy-in-us" || guidance.verdict === "bring-from-india") && (
+              <BuyCta
+                url={hold.price.buyUrl}
+                item={hold.item}
+                label={hold.price.buyLabel}
+                verdict={guidance.verdict}
+              />
+            )}
           {onRemove && (
             <button
               type="button"

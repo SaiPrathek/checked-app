@@ -260,7 +260,9 @@
         }
       },
       "price": {
-        "note": "Indian groceries ~4x India price in US stores"
+        "note": "Indian groceries ~4x India price in US stores",
+        "buyUrl": "https://www.amazon.in/s?k=spices",
+        "buyLabel": "Buy in India"
       },
       "weightNote": "light and high-value; declare at CBP",
       "communityStats": null
@@ -314,7 +316,10 @@
           "halal": "Check flavor packets for non-halal meat ingredients."
         }
       },
-      "price": null,
+      "price": {
+        "buyUrl": "https://www.amazon.in/s?k=instant%20food",
+        "buyLabel": "Buy in India"
+      },
       "weightNote": "light",
       "communityStats": null
     },
@@ -333,7 +338,10 @@
         "c056"
       ],
       "context": {},
-      "price": null,
+      "price": {
+        "buyUrl": "https://www.amazon.in/s?k=specialty%20snacks",
+        "buyLabel": "Buy in India"
+      },
       "weightNote": "light",
       "communityStats": null
     },
@@ -446,7 +454,10 @@
         "c022"
       ],
       "context": {},
-      "price": null,
+      "price": {
+        "buyUrl": "https://www.amazon.in/s?k=universal%20power%20adapter",
+        "buyLabel": "Buy in India"
+      },
       "weightNote": "light",
       "communityStats": null
     },
@@ -492,7 +503,10 @@
           "nonbinary": "Choose the one formal and one cultural outfit you feel best in."
         }
       },
-      "price": null,
+      "price": {
+        "buyUrl": "https://www.amazon.in/s?k=formal%20wear",
+        "buyLabel": "Buy in India"
+      },
       "weightNote": "1 outfit only",
       "communityStats": null
     },
@@ -539,7 +553,9 @@
       "price": {
         "inr": 300,
         "usd": 40,
-        "note": "Indicative starter-kit comparison; awaiting community validation"
+        "note": "Indicative starter-kit comparison; awaiting community validation",
+        "buyUrl": "https://www.amazon.in/s?k=filter%20coffee%20kit",
+        "buyLabel": "Buy in India"
       },
       "weightNote": "compact, high comfort-to-weight value",
       "communityStats": null
@@ -562,7 +578,10 @@
           "both": "Keep both beverage kits compact."
         }
       },
-      "price": null,
+      "price": {
+        "buyUrl": "https://www.amazon.in/s?k=chai%20kit",
+        "buyLabel": "Buy in India"
+      },
       "weightNote": "light; keep commercially sealed",
       "communityStats": null
     },
@@ -583,7 +602,10 @@
           "jain": "Choose onion-garlic-free blends."
         }
       },
-      "price": null,
+      "price": {
+        "buyUrl": "https://www.amazon.in/s?k=south%20indian%20spice%20kit",
+        "buyLabel": "Buy in India"
+      },
       "weightNote": "keep dry, sealed and declared",
       "communityStats": null
     },
@@ -604,7 +626,10 @@
           "jain": "Choose onion-garlic-free blends."
         }
       },
-      "price": null,
+      "price": {
+        "buyUrl": "https://www.amazon.in/s?k=north%20indian%20spice%20kit",
+        "buyLabel": "Buy in India"
+      },
       "weightNote": "keep dry, sealed and declared",
       "communityStats": null
     },
@@ -625,7 +650,10 @@
           "jain": "Choose onion-garlic-free mixes."
         }
       },
-      "price": null,
+      "price": {
+        "buyUrl": "https://www.amazon.in/s?k=west%20indian%20spice%20kit",
+        "buyLabel": "Buy in India"
+      },
       "weightNote": "keep dry, sealed and declared",
       "communityStats": null
     },
@@ -642,7 +670,10 @@
         "community-pending"
       ],
       "context": {},
-      "price": null,
+      "price": {
+        "buyUrl": "https://www.amazon.in/s?k=east%20indian%20spice%20kit",
+        "buyLabel": "Buy in India"
+      },
       "weightNote": "keep dry, sealed and declared",
       "communityStats": null
     },
@@ -659,7 +690,10 @@
         "community-pending"
       ],
       "context": {},
-      "price": null,
+      "price": {
+        "buyUrl": "https://www.amazon.in/s?k=jain%20masala%20set",
+        "buyLabel": "Buy in India"
+      },
       "weightNote": "dry and sealed only",
       "communityStats": null
     },
@@ -681,7 +715,10 @@
           "weekly": "One or two small packs are enough."
         }
       },
-      "price": null,
+      "price": {
+        "buyUrl": "https://www.amazon.in/s?k=pickles%20and%20podis",
+        "buyLabel": "Buy in India"
+      },
       "weightNote": "avoid glass and wet products",
       "communityStats": null
     },
@@ -700,7 +737,9 @@
       "context": {},
       "price": {
         "usd": 45,
-        "note": "Indicative US haircut cost; awaiting community validation"
+        "note": "Indicative US haircut cost; awaiting community validation",
+        "buyUrl": "https://www.amazon.in/s?k=grooming%20kit",
+        "buyLabel": "Buy in India"
       },
       "weightNote": "confirm 110–240V input",
       "communityStats": null
@@ -718,7 +757,10 @@
         "community-pending"
       ],
       "context": {},
-      "price": null,
+      "price": {
+        "buyUrl": "https://www.amazon.in/s?k=cosmetics%20and%20skincare%20starter",
+        "buyLabel": "Buy in India"
+      },
       "weightNote": "starter quantities only",
       "communityStats": null
     },
@@ -735,7 +777,10 @@
         "community-pending"
       ],
       "context": {},
-      "price": null,
+      "price": {
+        "buyUrl": "https://www.amazon.in/s?k=sanitary%20supply",
+        "buyLabel": "Buy in India"
+      },
       "weightNote": "compressible; starter supply only",
       "communityStats": null
     },

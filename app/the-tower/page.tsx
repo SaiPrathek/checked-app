@@ -268,11 +268,17 @@ export default function TheTower() {
                           ? ` · ${h.claimIds.length} source${h.claimIds.length > 1 ? "s" : ""} in The Hold`
                           : ""}
                       </p>
-                      {h.verdict === "buy-in-us" && h.price?.buyUrl && (
-                        <div className="mt-0.5">
-                          <BuyCta url={h.price.buyUrl} item={h.item} label={h.price.buyLabel} />
-                        </div>
-                      )}
+                      {h.price?.buyUrl &&
+                        (h.verdict === "buy-in-us" || h.verdict === "bring-from-india") && (
+                          <div className="mt-0.5">
+                            <BuyCta
+                              url={h.price.buyUrl}
+                              item={h.item}
+                              label={h.price.buyLabel}
+                              verdict={h.verdict}
+                            />
+                          </div>
+                        )}
                     </div>
                   ))}
                 </div>
