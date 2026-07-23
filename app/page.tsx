@@ -55,6 +55,29 @@ const FEATURES = [
 
 const BARS = [2, 1, 3, 1, 2, 1, 3, 2, 1];
 
+const STEPS = [
+  {
+    n: "01",
+    title: "Check in your details",
+    body: "Tell Checked your school, city, intake and housing in a quick conversational profile. Every packing verdict is tuned to your move from India to the US.",
+  },
+  {
+    n: "02",
+    title: "Get your Manifest",
+    body: "A personalized packing list with a clear call on every item — bring, buy, either or skip — weighing the India-vs-US price difference, luggage weight and what's easy to buy locally.",
+  },
+  {
+    n: "03",
+    title: "Weigh in your bags",
+    body: "Assign items to each bag and watch live weight meters, so you plan around airline limits and never get caught over the allowance at the airport counter.",
+  },
+  {
+    n: "04",
+    title: "Ask, then report back",
+    body: "Ask The Tower open questions about customs, winter gear or kitchen kit — grounded in community data — and Debrief after you land so the next student packs smarter.",
+  },
+];
+
 export default function Home() {
   const contested = HOLD.filter((h) => h.contested).length;
   return (
@@ -179,6 +202,38 @@ export default function Home() {
           </Link>
         ))}
       </div>
+
+      {/* how it works — server-rendered, indexable substance for head terms */}
+      <section className="mt-2">
+        <div className="mb-2 font-mono text-[11px] tracking-[0.2em] text-mono-muted">
+          FLIGHT PLAN
+        </div>
+        <h2 className="m-0 font-display text-[26px] font-bold tracking-[-0.01em]">
+          How Checked works
+        </h2>
+        <p className="mt-2.5 max-w-[620px] text-[15px] leading-[1.6] text-ink-muted">
+          Checked turns the chaos of a first move abroad into a clear,
+          weight-aware plan — built for Indian students heading to the US for a
+          masters or undergrad. Here&apos;s the path from your first day of
+          planning to the airport counter.
+        </p>
+
+        <ol className="mt-7 grid list-none grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-x-6 gap-y-7 p-0">
+          {STEPS.map((s) => (
+            <li key={s.n} className="flex flex-col gap-1.5">
+              <span className="font-mono text-[13px] tracking-[0.14em] text-accent">
+                {s.n}
+              </span>
+              <h3 className="m-0 font-display text-[16px] font-semibold text-ink">
+                {s.title}
+              </h3>
+              <p className="m-0 text-[13.5px] leading-[1.55] text-ink-muted">
+                {s.body}
+              </p>
+            </li>
+          ))}
+        </ol>
+      </section>
     </div>
   );
 }
