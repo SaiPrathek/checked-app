@@ -1,6 +1,42 @@
 import Link from "next/link";
 import { HOLD } from "@/lib/hold";
 
+const BASE = "https://checked.co.in";
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${BASE}/#organization`,
+      name: "Checked",
+      url: BASE,
+      logo: `${BASE}/icons/icon-512.png`,
+      description:
+        "A relocation copilot for Indian students moving to the US.",
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${BASE}/#website`,
+      name: "Checked",
+      url: BASE,
+      publisher: { "@id": `${BASE}/#organization` },
+      inLanguage: "en",
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "Checked",
+      applicationCategory: "TravelApplication",
+      operatingSystem: "Web",
+      url: BASE,
+      description:
+        "Personalized packing verdicts, a live luggage weigher, and community-backed guidance for Indian students moving to the US.",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      publisher: { "@id": `${BASE}/#organization` },
+    },
+  ],
+};
+
 const FLIGHTS = [
   { href: "/check-in", flight: "CK 01", name: "Check-In", dest: "Profile & preferences", gate: "A1", status: "BOARDING", fg: "#FFD98A", bg: "rgba(245,166,35,0.16)" },
   { href: "/manifest", flight: "CK 02", name: "The Manifest", dest: "Your packing list", gate: "B4", status: "ON TIME", fg: "#7BE0A8", bg: "rgba(20,122,72,0.2)" },
@@ -23,6 +59,10 @@ export default function Home() {
   const contested = HOLD.filter((h) => h.contested).length;
   return (
     <div className="flex flex-col gap-8">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* hero */}
       <section className="relative overflow-hidden rounded-[20px] border border-nav-border bg-nav px-[30px] pb-[34px] pt-[30px] shadow-[0_30px_60px_-30px_rgba(6,12,24,0.7)]">
         <div className="mb-[22px] flex items-center justify-between font-mono text-[11px] tracking-[0.2em] text-nav-muted">
