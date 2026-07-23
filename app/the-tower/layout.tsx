@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "The Tower — ask anything about moving to the US",
   description:
-    "Ask The Tower anything about relocating from India to the US — customs, winter gear, kitchen kit, what to bring vs buy — grounded in community-backed data from The Hold.",
+    "Ask The Tower anything about relocating from India to the US — customs, winter gear, kitchen kit, what to bring vs buy — grounded in The Hold, built from real student experiences.",
   alternates: { canonical: "/the-tower" },
   openGraph: {
     type: "website",
@@ -78,8 +78,8 @@ export default function TowerLayout({
           real questions about a first move abroad — what clears customs, what
           to bring versus buy, which kitchen kit is worth the luggage weight,
           and how to pack for a cold campus. Answers are grounded in{" "}
-          <span className="text-ink">The Hold</span>, a community-backed corpus
-          built from what students actually reported after they landed. Below
+          <span className="text-ink">The Hold</span>, a corpus built from what
+          students actually reported after they landed. Below
           are some of the questions that come up most.
         </p>
 

@@ -138,7 +138,8 @@ export default function TheTower() {
         </h1>
         <p className="mt-1.5 text-[15px] text-ink-muted">
           Ask anything about packing, customs, or bring-vs-buy. Answers are
-          generated live and grounded in The Hold — our community-backed corpus.
+          generated live and grounded in The Hold — our corpus built from real
+          student experiences.
         </p>
       </div>
 
@@ -278,7 +279,7 @@ export default function TheTower() {
               )}
 
               <p className="m-0 text-[11px] leading-[1.5] text-[#a79e8b]">
-                Guidance is drawn from community data in The Hold. Verify visa,
+                Guidance is drawn from The Hold. Verify visa,
                 immigration, customs, and medical specifics with official
                 sources such as USCIS, the U.S. Department of State, or your
                 university&apos;s international student office.

@@ -30,7 +30,7 @@ const jsonLd = {
       operatingSystem: "Web",
       url: BASE,
       description:
-        "Personalized packing verdicts, a live luggage weigher, and community-backed guidance for Indian students moving to the US.",
+        "Personalized packing verdicts, a live luggage weigher, and guidance built from students who've made the move, for Indian students moving to the US.",
       offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
       publisher: { "@id": `${BASE}/#organization` },
     },
@@ -49,8 +49,8 @@ const FEATURES = [
   { href: "/check-in", name: "Check-In", flight: "CK 01", gate: "A1", blurb: "A quick, conversational profile — school, city, intake and housing — so every verdict is personalized to you." },
   { href: "/manifest", name: "The Manifest", flight: "CK 02", gate: "B4", blurb: "Your packing list with a clear verdict on each item: bring, buy, either, or skip — with the reasoning." },
   { href: "/weigh-in", name: "Weigh-In", flight: "CK 03", gate: "C2", blurb: "Assign items to your bags and watch live weight meters. Never be 4 kg over at the airport counter again." },
-  { href: "/the-tower", name: "The Tower", flight: "CK 04", gate: "D7", blurb: "Ask anything — customs, winter gear, kitchen kit — grounded in The Hold's community data." },
-  { href: "/debrief", name: "Debrief", flight: "CK 05", gate: "E5", blurb: "Landed already? Tell us what was worth packing. Every rating strengthens the community-backed verdicts in The Hold." },
+  { href: "/the-tower", name: "The Tower", flight: "CK 04", gate: "D7", blurb: "Ask anything — customs, winter gear, kitchen kit — grounded in The Hold, built from real student experiences." },
+  { href: "/debrief", name: "Debrief", flight: "CK 05", gate: "E5", blurb: "Landed already? Tell us what was worth packing. Every rating helps build the community data behind The Hold's verdicts." },
 ];
 
 const BARS = [2, 1, 3, 1, 2, 1, 3, 2, 1];
@@ -74,7 +74,7 @@ const STEPS = [
   {
     n: "04",
     title: "Ask, then report back",
-    body: "Ask The Tower open questions about customs, winter gear or kitchen kit — grounded in community data — and Debrief after you land so the next student packs smarter.",
+    body: "Ask The Tower open questions about customs, winter gear or kitchen kit — grounded in The Hold — and Debrief after you land so the next student packs smarter.",
   },
 ];
 
@@ -100,7 +100,7 @@ export default function Home() {
         </h1>
         <p className="mt-[18px] max-w-[560px] text-[16px] leading-[1.55] text-[#a9bad4]">
           The chaos of a first move abroad, turned into a personalized,
-          weight-aware, community-backed checklist — item by item, bring-vs-buy,
+          weight-aware, student-sourced checklist — item by item, bring-vs-buy,
           with the reasoning behind every call.
         </p>
 

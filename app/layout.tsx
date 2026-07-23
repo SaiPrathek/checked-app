@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   },
   applicationName: "Checked",
   description:
-    "A relocation copilot for Indian students moving to the US — personalized packing verdicts, a live luggage weigher, and community-backed guidance.",
+    "A relocation copilot for Indian students moving to the US — personalized packing verdicts, a live luggage weigher, and guidance built from students who've made the move.",
   alternates: { canonical: "/" },
   keywords: [
     "packing list for US",
