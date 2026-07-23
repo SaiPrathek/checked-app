@@ -57,7 +57,8 @@ export default function Terms() {
       <h2>Changes &amp; contact</h2>
       <p>
         We may update these terms; continued use means you accept the changes.
-        Questions: <strong>[your contact email]</strong>.
+        Questions:{" "}
+        <a href="mailto:kothasaiprathek@gmail.com">kothasaiprathek@gmail.com</a>.
       </p>
     </LegalPage>
   );

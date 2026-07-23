@@ -30,7 +30,7 @@ export default function Disclosure() {
         Commissions help keep Checked free and independent. If our incentives and
         your interests ever seem to conflict, our commitment is simple: the
         honest verdict wins. Questions:{" "}
-        <strong>[your contact email]</strong>.
+        <a href="mailto:kothasaiprathek@gmail.com">kothasaiprathek@gmail.com</a>.
       </p>
     </LegalPage>
   );

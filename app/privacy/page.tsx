@@ -64,7 +64,8 @@ export default function Privacy() {
 
       <h2>Contact</h2>
       <p>
-        Questions or data requests: <strong>[your contact email]</strong>.
+        Questions or data requests:{" "}
+        <a href="mailto:kothasaiprathek@gmail.com">kothasaiprathek@gmail.com</a>.
       </p>
     </LegalPage>
   );
