@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { useApp } from "@/lib/store";
+import { JourneyNav } from "@/components/journey-nav";
 import {
   BAG_CATALOG,
   bagDef,
@@ -177,10 +178,9 @@ export default function WeighIn() {
 
   if (items.length === 0) {
     return (
-      <div className="mx-auto max-w-md py-16 text-center">
-        <div className="mb-2 font-mono text-[11px] tracking-[0.2em] text-mono-muted">
-          GATE C2 · CK 03 · BAGGAGE LAB
-        </div>
+      <div className="flex flex-col gap-5">
+        <JourneyNav current="weigh-in" />
+        <div className="mx-auto max-w-md py-12 text-center">
         <h1 className="m-0 font-display text-[34px] font-bold tracking-[-0.02em]">Weigh-In</h1>
         <p className="mx-auto mt-3 max-w-sm text-ink-muted">
           Nothing to weigh yet. Add items in The Manifest, then come back to pack them into bags.
@@ -188,6 +188,7 @@ export default function WeighIn() {
         <Link href="/manifest" className="mt-5 inline-flex h-11 items-center rounded-[9px] bg-accent px-5 text-[14.5px] font-semibold text-accent-ink">
           Go to The Manifest →
         </Link>
+        </div>
       </div>
     );
   }
@@ -269,12 +270,10 @@ export default function WeighIn() {
 
   return (
     <div className="flex flex-col gap-5">
+      <JourneyNav current="weigh-in" />
       <div className="flex flex-wrap items-end justify-between gap-3.5">
         <div>
           <div className="mb-2 flex items-center gap-2.5">
-            <span className="font-mono text-[11px] tracking-[0.2em] text-mono-muted">
-              GATE C2 · CK 03 · BAGGAGE LAB
-            </span>
             <TourButton onClick={tour.start} />
           </div>
           <h1 className="m-0 font-display text-[34px] font-bold tracking-[-0.02em]">Weigh-In</h1>

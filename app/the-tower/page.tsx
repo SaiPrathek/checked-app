@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { HOLD } from "@/lib/hold";
 import { searchHold } from "@/lib/guidance";
 import { useApp } from "@/lib/store";
@@ -104,6 +105,12 @@ export default function TheTower() {
 
   return (
     <div className="mx-auto flex max-w-[680px] flex-col gap-5">
+      <Link
+        href="/"
+        className="flex w-fit items-center gap-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.1em] text-ink-muted transition-colors hover:text-primary"
+      >
+        <span aria-hidden>←</span> Home
+      </Link>
       <div>
         <div className="mb-2 font-mono text-[11px] tracking-[0.2em] text-mono-muted">
           GATE D7 · CK 04 · ATC

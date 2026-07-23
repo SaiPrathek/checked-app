@@ -15,6 +15,7 @@ import { CHECKLIST, checklistFor, checklistProgress, type ChecklistRow } from "@
 import { classifyCustomItem } from "@/lib/actions/claude";
 import { CATEGORY_LABEL } from "@/lib/labels";
 import { ImportPanel } from "@/components/manifest/import-panel";
+import { JourneyNav } from "@/components/journey-nav";
 import { ItemIcon } from "@/components/item-icon";
 import { VerdictBadge } from "@/components/ui/verdict-badge";
 import { CommunityStat } from "@/components/ui/community-stat";
@@ -215,12 +216,10 @@ export default function Manifest() {
 
   return (
     <div className="flex flex-col gap-[22px]">
+      <JourneyNav current="manifest" />
       <div className="flex flex-wrap items-end justify-between gap-3.5">
         <div>
           <div className="mb-2 flex items-center gap-2.5">
-            <span className="font-mono text-[11px] tracking-[0.2em] text-mono-muted">
-              GATE B4 · CK 02
-            </span>
             <TourButton onClick={tour.start} />
           </div>
           <h1 className="m-0 font-display text-[34px] font-bold tracking-[-0.02em]">

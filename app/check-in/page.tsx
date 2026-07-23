@@ -19,6 +19,7 @@ import { useApp } from "@/lib/store";
 import type { Profile } from "@/lib/types";
 import { Tour, type TourStep } from "@/components/tour/tour";
 import { TourButton } from "@/components/tour/tour-button";
+import { JourneyNav } from "@/components/journey-nav";
 import { useTourController } from "@/lib/tour";
 
 const STEPS_CHECKIN: TourStep[] = [
@@ -394,12 +395,10 @@ export default function CheckIn() {
 
   return (
     <div className="mx-auto flex max-w-[760px] flex-col gap-5">
+      <JourneyNav current="check-in" showNext={Boolean(profile.completed)} />
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="mb-2 flex items-center gap-2.5">
-            <span className="font-mono text-[11px] tracking-[0.2em] text-mono-muted">
-              GATE A1 · CK 01
-            </span>
             {mode !== "review" && <TourButton onClick={tour.start} />}
           </div>
           <h1 className="m-0 font-display text-[34px] font-bold tracking-[-0.02em]">
