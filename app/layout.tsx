@@ -4,9 +4,11 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { AppProvider } from "@/lib/store";
+import Link from "next/link";
 import { Nav } from "@/components/nav";
 import { LogoMark } from "@/components/logo";
 import { SyncBanner } from "@/components/sync-banner";
+import { ConsentBanner } from "@/components/consent-banner";
 
 const display = Space_Grotesk({
   subsets: ["latin"],
@@ -101,8 +103,22 @@ export default function RootLayout({
                 verdicts reflect community data and item facts alone, and
                 commissions never influence them.
               </span>
+              <nav className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 normal-case tracking-normal text-[10.5px]">
+                <Link href="/privacy" className="text-[#a79e8b] hover:text-primary">
+                  Privacy
+                </Link>
+                <span aria-hidden className="text-[#d8cdb8]">·</span>
+                <Link href="/terms" className="text-[#a79e8b] hover:text-primary">
+                  Terms
+                </Link>
+                <span aria-hidden className="text-[#d8cdb8]">·</span>
+                <Link href="/disclosure" className="text-[#a79e8b] hover:text-primary">
+                  Affiliate Disclosure
+                </Link>
+              </nav>
             </footer>
             <SyncBanner />
+            <ConsentBanner />
           </AppProvider>
           <Analytics />
         </body>
