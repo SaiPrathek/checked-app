@@ -49,7 +49,7 @@ export const metadata: Metadata = {
     siteName: "Checked",
     title: "Checked — Everything, checked.",
     description:
-      "Pack smarter for your move from India to the US: bring-vs-buy verdicts, a live luggage weigher, and community-backed guidance.",
+      "Pack smarter for your move from India to the US — bring-vs-buy verdicts and a live luggage weigher.",
     images: [
       {
         url: "/brand/checked-social.png",
@@ -63,7 +63,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Checked — Everything, checked.",
     description:
-      "Pack smarter for your move from India to the US: bring-vs-buy verdicts, a live luggage weigher, and community-backed guidance.",
+      "Pack smarter for your move from India to the US — bring-vs-buy verdicts and a live luggage weigher.",
     images: ["/brand/checked-social.png"],
   },
 };
